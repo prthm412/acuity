@@ -1,0 +1,65 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.vcxproj.user
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data files (large datasets)
+data/raw/qbench/
+data/raw/kadid/
+data/processed/*.h5
+*.png
+*.jpg
+*.jpeg
+*.obj
+*.ply
+*.stl
+*.fbx
+
+# Model files
+*.pth
+*.onnx
+*.pkl
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~

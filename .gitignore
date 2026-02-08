@@ -3,6 +3,10 @@ build/
 cmake-build-*/
 out/
 
+# Documents
+docs/literature
+docs/notes
+
 # IDE files
 .vs/
 .vscode/

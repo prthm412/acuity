@@ -3,6 +3,9 @@ build/
 cmake-build-*/
 out/
 
+vcpkg_installed/
+packages/
+
 # Documents
 docs/literature
 docs/notes
@@ -67,3 +70,6 @@ Thumbs.db
 *.bak
 *.swp
 *~
+
+# new instructions file
+INSTRUCTIONS.md

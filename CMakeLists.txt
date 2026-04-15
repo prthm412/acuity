@@ -26,6 +26,9 @@ set(SOURCES
     src/renderer/Pipeline.cpp
     src/renderer/Mesh.cpp
     src/renderer/Camera.cpp
+    src/lod/QuadricSimplifier.cpp
+    src/lod/LODGenerator.cpp
+    src/lod/GeometricLODSelector.cpp
 )
 
 add_executable(Acuity ${SOURCES})

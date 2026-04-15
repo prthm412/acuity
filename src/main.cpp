@@ -1,5 +1,5 @@
 // ============================================================
-// Acuity - Renderer
+// Acuity - 1.4 Basic LOD Selector
 // This file verifies all dependencies are linked correctly.
 // ============================================================
 
@@ -19,10 +19,15 @@
 #include "renderer/RenderPass.h"
 #include "renderer/VulkanContext.h"
 
+#include "lod/LODMesh.h"
+#include "lod/LODGenerator.h"
+#include "lod/GeometricLODSelector.h"
+
 #include <iostream>
 #include <stdexcept>
 #include <chrono>
 #include <string>
+#include <numeric>
 
 // Constants
 constexpr uint32_t WINDOW_WIDTH  = 1280;
@@ -43,6 +48,7 @@ bool    g_mouseMMB      = false;
 double  g_lastMouseX    = 0.0;
 double  g_lastMouseY    = 0.0;
 bool    g_framebufferResized = false;
+bool    g_lodVisualization   = false;   // V key toggles LOD color mode
 
 // GLFW callbacks
 void framebufferResizeCallback(GLFWwindow*, int, int) {
@@ -69,6 +75,7 @@ void scrollCallback(GLFWwindow*, double, double yoffset) {
 void keyCallback(GLFWwindow* window, int key, int, int action, int) {
     if (action == GLFW_PRESS) {
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, GLFW_TRUE);
+        if (key == GLFW_KEY_V)      g_lodVisualization = !g_lodVisualization;
         g_camera.onKeyPress(key);
     }
 }
@@ -88,7 +95,8 @@ class AcuityApp {
         acuity::VulkanContext   ctx;
         acuity::RenderPass      renderPass;
         acuity::Pipeline        pipeline;
-        acuity::Mesh            mesh;
+        acuity::LODMesh         lodMesh;
+        acuity::GeometricLODSelector lodSelector;
 
         // Per-frame synchronization objects
         std::vector<VkSemaphore> imageAvailableSemaphores;
@@ -104,6 +112,12 @@ class AcuityApp {
         uint32_t frameCount = 0;
         float    fps        = 0.0f;
         std::chrono::steady_clock::time_point lastFpsTime;
+
+        // LOD performance tracking (for baseline report)
+        int         currentLODLevel  = 0;
+        float       currentDistance  = 0.0f;
+        uint32_t    framesSinceStart = 0;
+        std::vector<float> fpsHistory;
 
         void initWindow() {
             glfwInit();
@@ -122,28 +136,33 @@ class AcuityApp {
             renderPass.init(ctx);
             pipeline.init(ctx, renderPass.renderPass, "shaders/mesh.vert.spv", "shaders/mesh.frag.spv");
 
-            // Load mesh (or generate procedural sphere if no path given)
+            // In Step 1.3 it was: Load mesh (or generate procedural sphere if no path given)
+            // Step 1.4: Generate LOD hierarchy
             if (!meshPath.empty()) {
-                if (!mesh.loadFromFile(meshPath)) {
-                    std::cerr << "[App] Mesh load failed, using procedural sphere" << std::endl;
-                    generateSphere(1.0f, 32, 32);
-                }
+                lodMesh = acuity::LODGenerator::generateFromFile(meshPath);
             } else {
-                generateSphere(1.0f, 32, 32);
+                // Use procedural sphere as default
+                lodMesh = generateSphereLODs(1.0f, 32, 32);
             }
-            mesh.uploadToGPU(ctx.device, ctx.physicalDevice, ctx.commandPool, ctx.graphicsQueue);
+
+            // Upload all LOD levels to GPU
+            acuity::LODGenerator::uploadToGPU(lodMesh, ctx.device,
+                                                       ctx.physicalDevice,
+                                                       ctx.commandPool,
+                                                       ctx.graphicsQueue);
 
             createCommandBuffers();
             createSyncObjects();
             initImGui();
 
             lastFpsTime = std::chrono::steady_clock::now();
-            std::cout << "[App] Initialized. Controls: LMB=orbit, MMB=pan, scroll=zoom, R=reset" << std::endl;
+            std::cout << "[App] LOD systems ready. Controls: LMB=orbit, MMB=pan, scroll=zoom, R=reset" << std::endl;
         }
 
-        void generateSphere(float radius, int stacks, int slices) {
-            mesh.vertices.clear();
-            mesh.indices.clear();
+        // Generate procedural sphere at multiple LOD levls
+        acuity::LODMesh generateSphereLODs(float radius, int stacks, int slices) {
+            std::vector<acuity::Vertex> vertices;
+            std::vector<uint32_t>       indices;
 
             for (int i = 0; i <= stacks; ++i) {
                 float phi = glm::pi<float>() * i / stacks;
@@ -156,35 +175,30 @@ class AcuityApp {
                         radius * sin(phi) * sin(theta)
                     };
                     v.normal = glm::normalize(v.position);
-                    v.color  = { 0.7f, 0.7f, 0.9f };
-                    mesh.vertices.push_back(v);
+                    v.color  = glm::vec3(0.7f, 0.7f, 0.9f);
+                    vertices.push_back(v);
                 }
             }
             for (int i = 0; i < stacks; ++i) {
                 for (int j = 0; j < slices; ++j) {
                     int a = i * (slices + 1) + j;
                     int b = a + slices + 1;
-                    mesh.indices.push_back(a);
-                    mesh.indices.push_back(b);
-                    mesh.indices.push_back(a + 1);
-                    mesh.indices.push_back(b);
-                    mesh.indices.push_back(b + 1);
-                    mesh.indices.push_back(a + 1);
+                    indices.push_back(a);   indices.push_back(b);
+                    indices.push_back(a+1); indices.push_back(b);
+                    indices.push_back(b+1); indices.push_back(a+1);
                 }
             }
-            std::cout << "[App] Procedural sphere: "
-                      << mesh.vertices.size() << " vertices, "
-                      << mesh.indices.size() / 3 << " triangles" << std::endl;
+            return acuity::LODGenerator::generate("sphere", vertices, indices);
         }
 
         void createCommandBuffers() {
             commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-            VkCommandBufferAllocateInfo allocInfo{};
-            allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            allocInfo.commandPool        = ctx.commandPool;
-            allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            allocInfo.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
-            if (vkAllocateCommandBuffers(ctx.device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+            VkCommandBufferAllocateInfo ai{};
+            ai.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            ai.commandPool        = ctx.commandPool;
+            ai.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            ai.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
+            if (vkAllocateCommandBuffers(ctx.device, &ai, commandBuffers.data()) != VK_SUCCESS)
                 throw std::runtime_error("Failed to allocate command buffers");
         }
 
@@ -193,113 +207,114 @@ class AcuityApp {
             renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
             inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
-            VkSemaphoreCreateInfo semInfo{};
-            semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-            VkFenceCreateInfo fenceInfo{};
-            fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-            fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;     // start signaled so first frame does not hang
+            VkSemaphoreCreateInfo si{};
+            si.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            VkFenceCreateInfo fi{};
+            fi.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            fi.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-                if (vkCreateSemaphore(ctx.device, &semInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-                    vkCreateSemaphore(ctx.device, &semInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-                    vkCreateFence    (ctx.device, &fenceInfo, nullptr, &inFlightFences[i])         != VK_SUCCESS)
+                if (vkCreateSemaphore(ctx.device, &si, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+                    vkCreateSemaphore(ctx.device, &si, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+                    vkCreateFence    (ctx.device, &fi, nullptr, &inFlightFences[i])           != VK_SUCCESS)
                     throw std::runtime_error("Failed to create sync objects");
             }
         }
 
         void initImGui() {
-            // ImGui descriptor pool (needs a large pool for its own textures)
             VkDescriptorPoolSize poolSizes[] = {
                 { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 }
             };
-            VkDescriptorPoolCreateInfo poolInfo{};
-            poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-            poolInfo.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            poolInfo.maxSets       = 1000;
-            poolInfo.poolSizeCount = 1;
-            poolInfo.pPoolSizes    = poolSizes;
-            vkCreateDescriptorPool(ctx.device, &poolInfo, nullptr, &imguiPool);
+            VkDescriptorPoolCreateInfo pi{};
+            pi.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+            pi.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+            pi.maxSets       = 1000;
+            pi.poolSizeCount = 1;
+            pi.pPoolSizes    = poolSizes;
+            vkCreateDescriptorPool(ctx.device, &pi, nullptr, &imguiPool);
 
             IMGUI_CHECKVERSION();
             ImGui::CreateContext();
             ImGui::StyleColorsDark();
-
             ImGui_ImplGlfw_InitForVulkan(window, true);
 
             ImGui_ImplVulkan_InitInfo initInfo{};
-            initInfo.ApiVersion         = VK_API_VERSION_1_2;
-            initInfo.Instance           = ctx.instance;
-            initInfo.PhysicalDevice     = ctx.physicalDevice;
-            initInfo.Device             = ctx.device;
-            initInfo.QueueFamily        = ctx.findQueueFamilies(ctx.physicalDevice).graphicsFamily.value();
-            initInfo.Queue              = ctx.graphicsQueue;
-            initInfo.DescriptorPool     = imguiPool;
-            initInfo.MinImageCount      = MAX_FRAMES_IN_FLIGHT;
-            initInfo.ImageCount         = static_cast<uint32_t>(ctx.swapchainImages.size());
-            initInfo.PipelineInfoMain.RenderPass = renderPass.renderPass;
+            initInfo.ApiVersion                      = VK_API_VERSION_1_2;
+            initInfo.Instance                        = ctx.instance;
+            initInfo.PhysicalDevice                  = ctx.physicalDevice;
+            initInfo.Device                          = ctx.device;
+            initInfo.QueueFamily                     = ctx.findQueueFamilies(ctx.physicalDevice).graphicsFamily.value();
+            initInfo.Queue                           = ctx.graphicsQueue;
+            initInfo.DescriptorPool                  = imguiPool;
+            initInfo.MinImageCount                   = MAX_FRAMES_IN_FLIGHT;
+            initInfo.ImageCount                      = static_cast<uint32_t>(ctx.swapchainImages.size());
+            initInfo.PipelineInfoMain.RenderPass     = renderPass.renderPass;
             ImGui_ImplVulkan_Init(&initInfo);
         }
 
-        // Main loop
         void mainLoop() {
             while (!glfwWindowShouldClose(window)) {
                 glfwPollEvents();
                 updateFPS();
+                updateLOD();
                 drawFrame();
+                ++framesSinceStart;
             }
             vkDeviceWaitIdle(ctx.device);
         }
 
         void updateFPS() {
             ++frameCount;
-            auto now = std::chrono::steady_clock::now();
+            auto  now     = std::chrono::steady_clock::now();
             float elapsed = std::chrono::duration<float>(now - lastFpsTime).count();
             if (elapsed >= 0.5f) {
                 fps = frameCount / elapsed;
-                frameCount = 0;
+                fpsHistory.push_back(fps);
+                frameCount  = 0;
                 lastFpsTime = now;
-                std::string title = "Acuity | FPS: " + std::to_string(static_cast<int>(fps));
+                std::string title = "Acuity | FPS: " + std::to_string(int(fps))
+                                + " | LOD: " + std::to_string(currentLODLevel);
                 glfwSetWindowTitle(window, title.c_str());
             }
         }
 
+        void updateLOD() {
+            // Select LOD based on camera distance to origin (where our mesh sits)
+            glm::vec3 camPos   = g_camera.getPosition();
+            glm::vec3 meshPos  = glm::vec3(0.0f);
+            currentDistance    = glm::length(camPos - meshPos);
+            currentLODLevel    = lodSelector.selectLOD(camPos, meshPos, lodMesh);
+        }
+
         void drawFrame() {
-            // Wait for previous frame using this slot to finish
             vkWaitForFences(ctx.device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
-            // Acquire next swapchain image
             uint32_t imageIndex;
             VkResult result = vkAcquireNextImageKHR(ctx.device, ctx.swapchain, UINT64_MAX,
                                                     imageAvailableSemaphores[currentFrame],
                                                     VK_NULL_HANDLE, &imageIndex);
-            if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-                recreateSwapchain(); return;
-            }
+            if (result == VK_ERROR_OUT_OF_DATE_KHR) { recreateSwapchain(); return; }
 
             vkResetFences(ctx.device, 1, &inFlightFences[currentFrame]);
 
-            // Record commands for this frame
             VkCommandBuffer cmd = commandBuffers[currentFrame];
             vkResetCommandBuffer(cmd, 0);
             recordCommandBuffer(cmd, imageIndex);
 
-            // submit to GPU
             VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            VkSubmitInfo submitInfo{};
-            submitInfo.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submitInfo.waitSemaphoreCount   = 1;
-            submitInfo.pWaitSemaphores      = &imageAvailableSemaphores[currentFrame];
-            submitInfo.pWaitDstStageMask    = &waitStage;
-            submitInfo.commandBufferCount   = 1;
-            submitInfo.pCommandBuffers      = &cmd;
-            submitInfo.signalSemaphoreCount = 1;
-            submitInfo.pSignalSemaphores    = &renderFinishedSemaphores[currentFrame];
+            VkSubmitInfo si{};
+            si.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            si.waitSemaphoreCount   = 1;
+            si.pWaitSemaphores      = &imageAvailableSemaphores[currentFrame];
+            si.pWaitDstStageMask    = &waitStage;
+            si.commandBufferCount   = 1;
+            si.pCommandBuffers      = &cmd;
+            si.signalSemaphoreCount = 1;
+            si.pSignalSemaphores    = &renderFinishedSemaphores[currentFrame];
 
-            if (vkQueueSubmit(ctx.graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
+            if (vkQueueSubmit(ctx.graphicsQueue, 1, &si, inFlightFences[currentFrame]) != VK_SUCCESS)
                 throw std::runtime_error("Failed to submit draw command buffer");
-            
-            // Present rendered image to screen
+
             VkPresentInfoKHR presentInfo{};
             presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
             presentInfo.waitSemaphoreCount = 1;
@@ -309,37 +324,33 @@ class AcuityApp {
             presentInfo.pImageIndices      = &imageIndex;
 
             result = vkQueuePresentKHR(ctx.presentQueue, &presentInfo);
-            if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || g_framebufferResized) {
+            if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
+                || g_framebufferResized) {
                 g_framebufferResized = false;
                 recreateSwapchain();
             }
-
             currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         }
 
         void recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            vkBeginCommandBuffer(cmd, &beginInfo);
+            VkCommandBufferBeginInfo bi{};
+            bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            vkBeginCommandBuffer(cmd, &bi);
 
             renderPass.begin(cmd, imageIndex, ctx.swapchainExtent);
-
             pipeline.bind(cmd);
 
-            // Dynamic viewport and scissor
             VkViewport viewport{};
-            viewport.x        = 0.0f; viewport.y      = 0.0f;
-            viewport.width    = static_cast<float>(ctx.swapchainExtent.width);
-            viewport.height   = static_cast<float>(ctx.swapchainExtent.height);
+            viewport.x = 0; viewport.y = 0;
+            viewport.width    = float(ctx.swapchainExtent.width);
+            viewport.height   = float(ctx.swapchainExtent.height);
             viewport.minDepth = 0.0f; viewport.maxDepth = 1.0f;
             vkCmdSetViewport(cmd, 0, 1, &viewport);
 
             VkRect2D scissor{ {0,0}, ctx.swapchainExtent };
             vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-            // Push MVP matrices as push constants
-            float aspect = static_cast<float>(ctx.swapchainExtent.width) /
-                        static_cast<float>(ctx.swapchainExtent.height);
+            float aspect = float(ctx.swapchainExtent.width) / float(ctx.swapchainExtent.height);
             PushConstantData pc{};
             pc.model      = glm::mat4(1.0f);
             pc.view       = g_camera.getViewMatrix();
@@ -347,25 +358,54 @@ class AcuityApp {
             vkCmdPushConstants(cmd, pipeline.pipelineLayout,
                             VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pc);
 
-            // Bind vertex and index buffers, draw
-            VkBuffer     vbufs[]  = { mesh.vertexBuffer };
+            // Draw the currently selected LOD level
+            acuity::LODLevel& level = lodMesh.levels[currentLODLevel];
+
+            // In visualization mode, colors are already baked into vertices (LOD_COLORS)
+            // In normal mode, we use the default grey color
+            if (!g_lodVisualization) {
+                // Temporarily set grey for normal rendering
+                // (colors are already set correctly from LODGenerator)
+            }
+
+            VkBuffer     vbufs[]   = { level.mesh.vertexBuffer };
             VkDeviceSize offsets[] = { 0 };
             vkCmdBindVertexBuffers(cmd, 0, 1, vbufs, offsets);
-            vkCmdBindIndexBuffer  (cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdDrawIndexed      (cmd, mesh.getIndexCount(), 1, 0, 0, 0);
+            vkCmdBindIndexBuffer  (cmd, level.mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdDrawIndexed      (cmd, level.mesh.getIndexCount(), 1, 0, 0, 0);
 
             // ImGui overlay
             ImGui_ImplVulkan_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Always);
-            ImGui::SetNextWindowSize({220, 120}, ImGuiCond_Always);
-            ImGui::Begin("Acuity Debug", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-            ImGui::Text("FPS: %.1f", fps);
-            ImGui::Text("Vertices:  %u", mesh.getVertexCount());
-            ImGui::Text("Triangles: %u", mesh.getIndexCount() / 3);
-            ImGui::Text("R = reset camera");
+            ImGui::SetNextWindowPos ({10, 10},  ImGuiCond_Always);
+            ImGui::SetNextWindowSize({260, 200}, ImGuiCond_Always);
+            ImGui::Begin("Acuity Debug", nullptr,
+                        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+
+            ImGui::Text("FPS:       %.1f", fps);
+            ImGui::Separator();
+            ImGui::Text("LOD Level: %d / %d", currentLODLevel,
+                        int(lodMesh.levelCount()) - 1);
+            ImGui::Text("Triangles: %u", level.triangleCount);
+            ImGui::Text("Distance:  %.2f", currentDistance);
+            ImGui::Text("Ratio:     %.1f%%", level.targetRatio * 100.0f);
+            ImGui::Separator();
+
+            // LOD level breakdown
+            for (int i = 0; i < int(lodMesh.levelCount()); ++i) {
+                bool active = (i == currentLODLevel);
+                if (active) ImGui::PushStyleColor(ImGuiCol_Text, {0.3f,1.0f,0.3f,1.0f});
+                ImGui::Text("  LOD%d: %u tris (%.1f%%)", i,
+                            lodMesh.levels[i].triangleCount,
+                            lodMesh.levels[i].targetRatio * 100.0f);
+                if (active) ImGui::PopStyleColor();
+            }
+
+            ImGui::Separator();
+            ImGui::Text("V = toggle LOD colors");
+            ImGui::Text("LOD colors: %s", g_lodVisualization ? "ON" : "OFF");
             ImGui::End();
 
             ImGui::Render();
@@ -377,11 +417,13 @@ class AcuityApp {
         }
 
         void recreateSwapchain() {
+            int w = 0, h = 0;
+            while (w == 0 || h == 0) { glfwGetFramebufferSize(window, &w, &h); glfwWaitEvents(); }
             vkDeviceWaitIdle(ctx.device);
             renderPass.recreate(ctx);
             pipeline.destroy(ctx.device);
             pipeline.init(ctx, renderPass.renderPass,
-                          "shaders/mesh.vert.spv", "shaders/mesh.frag.spv");
+                        "shaders/mesh.vert.spv", "shaders/mesh.frag.spv");
         }
 
         void cleanup() {
@@ -393,9 +435,9 @@ class AcuityApp {
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
                 vkDestroySemaphore(ctx.device, imageAvailableSemaphores[i], nullptr);
                 vkDestroySemaphore(ctx.device, renderFinishedSemaphores[i], nullptr);
-                vkDestroyFence    (ctx.device, inFlightFences[i],           nullptr);
+                vkDestroyFence    (ctx.device, inFlightFences[i], nullptr);
             }
-            mesh.destroy(ctx.device);
+            lodMesh.destroy(ctx.device);
             pipeline.destroy(ctx.device);
             renderPass.destroy(ctx.device);
             ctx.destroy();
@@ -404,8 +446,7 @@ class AcuityApp {
         }
 };
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     std::string meshPath = (argc > 1) ? argv[1] : "";
     AcuityApp app;
     try {

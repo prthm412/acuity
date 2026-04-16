@@ -224,6 +224,14 @@ acuity/
 - [x] Phase 1.4: Baseline LOD system
 - [x] Phase 2.1: Dataset
 
+### Progress Screenshots
+Basic Renderer (Phase 1)
+![Acuity Renderer](docs/screenshots/1.3_renderer.png)
+
+LOD Selection system (Phase 2; different colors and level of details for different distances)
+![Acuity Renderer](docs/screenshots/1.4_lod_selection_1.png)
+![Acuity Renderer](docs/screenshots/1.4_lod_selection_2.png)
+
 
 ## License
 

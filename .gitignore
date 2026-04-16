@@ -44,9 +44,16 @@ venv/
 data/raw/qbench/
 data/raw/kadid/
 data/processed/*.h5
-*.png
-*.jpg
+
+# < ! IMPORTANT >
+# Images - exclude dataset/render images but allow screenshots and assets
+data/raw/**/*.png
+data/raw/**/*.jpg
+data/processed/**/*.png
+data/processed/**/*.jpg
+results/**/*.png
 *.jpeg
+
 *.obj
 *.ply
 *.stl

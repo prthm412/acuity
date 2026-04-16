@@ -7,13 +7,19 @@ A research project implementing ML-based perceptual quality assessment for real-
 ## Overview
 
 Reduces memory usage in real-time 3D rendering by using a learned perceptual quality model to intelligently select mesh LOD levels, maintaining visual quality while optimizing resources.
+This project aims to reduce memory usage in real-time 3D rendering by using a learned perceptual quality model to intelligently select mesh LOD levels, maintaining visual quality while optimizing resource usage.
 
-**Key Innovation**: First system to apply learned image quality assessment to real-time triangle mesh LOD selection.
+**Key Innovation**: Building a system to apply learned image quality assessment to real-time triangle mesh LOD selection.
 
----
 
 ## Tech Stack
 
+- **Rendering**: C++17, Vulkan
+- **Machine Learning**: Python, PyTorch, ONNX Runtime
+- **Build System**: CMake
+- **Dependencies**: GLFW, GLM, Assimp, ImGui
+
+### Detailed Stack
 ### C++ Rendering Engine
 
 - **Graphics API**: Vulkan 1.4.341.1
@@ -32,7 +38,6 @@ Reduces memory usage in real-time 3D rendering by using a learned perceptual qua
 - **Inference**: ONNX Runtime 1.20+
 - **Dataset**: Q-Bench (ICLR 2024)
 
----
 
 ## System Requirements
 
@@ -50,7 +55,6 @@ Reduces memory usage in real-time 3D rendering by using a learned perceptual qua
 - **RAM**: 16 GB+
 - **Storage**: 100 GB SSD
 
----
 
 ## Build Instructions
 
@@ -79,14 +83,13 @@ Install these tools in order:
 
    - Verify: `git --version`
 
----
 
 ### Installation
 
 #### Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/acuity.git
+git clone https://github.com/orthm412/acuity.git
 cd acuity
 git checkout develop
 ```
@@ -171,75 +174,75 @@ Expected output:
 Environment setup complete. Ready for Step 1.3!
 ```
 
----
-
 ## Project Structure
 
 ```
 acuity/
-├── src/           # C++ source code
-│   ├── core/      # Application, window, timer
-│   ├── renderer/  # Vulkan renderer
-│   ├── mesh/      # Mesh loading & processing
-│   ├── lod/       # LOD generation & selection
-│   ├── ml/        # ONNX inference
-│   └── ui/        # ImGui debug UI
-├── python/        # ML training pipeline
-│   ├── dataset/   # Data generation
-│   ├── training/  # Model training
-│   └── analysis/  # Results analysis
-├── shaders/       # GLSL shaders
-├── assets/        # 3D models, textures
-├── data/          # Datasets, trained models
-├── docs/          # Documentation
-└── results/       # Benchmarks, figures
+├── src/                    # C++ source code
+│   ├── renderer/           # Vulkan renderer
+│   ├── lod/                # LOD system
+│   ├── ml/                 # ONNX Runtime inference wrapper
+│   └── benchmark/          # Benchmark suite
+├── python/                 # ML training pipeline
+│   ├── dataset/            # Dataset generation & feature extraction
+│   ├── training/           # Model training & evaluation
+│   └── evaluation/         # Results analysis & ablation studies
+├── assets/
+│   ├── shaders/            # GLSL shaders
+│   └── models/             # 3D mesh files
+├── data/
+│   ├── raw/                # Downloaded datasets
+│   ├── processed/          # Generated dataset, features, splits
+│   └── models/             # Trained model files
+├── docs/
+│   ├── screenshots/        # Renderer screenshots
+│   ├── experiments/        # Experiment logs & baseline reports
+│   └── notes/              # Research notes & literature review
+├── results/                # Benchmark results, figures, LaTeX tables
+├── diagrams/               # Class diagrams & architecture documentation
+└── build/                  # CMake build output (gitignored)
 ```
-
----
 
 ## Development Status
 
-**Current Phase**: Phase 1 - Foundation
-**Current Step**: Step 1.2 - Environment Setup
+![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
+![Phase](https://img.shields.io/badge/Phase-2%20of%204(5)-blue)
+
+### Currently working on
+
+🚧 **In Development** - Phase 2: Data Generation
+
+
+- [ ] Phase 2.2: Rendering Pipeline
+- [ ] Phase 2.3: Quality Annotation
 
 ### Completed
 
-- ✅ Phase 0: GitHub repository setup
-- ✅ Phase 1.1: Literature review
-- 🔄 Phase 1.2: Environment setup (in progress)
+- [x] Phase 1.1: Literature review
+- [x] Phase 1.2: Environment setup (in progress)
+- [x] Phase 1.3: Basic Vulkan renderer
+- [x] Phase 1.4: Baseline LOD system
+- [x] Phase 2.1: Dataset
 
-### Next Steps
-
-- [ ] Phase 1.3: Basic Vulkan renderer
-- [ ] Phase 1.4: Baseline LOD system
-
----
-
-## Technology References
-
-### Core Papers
-
-- **Quadric Error Metrics**: Garland & Heckbert (SIGGRAPH 1997)
-- **Q-Bench Dataset**: Wu et al. (ICLR 2024)
-- **LPIPS Metric**: Zhang et al. (CVPR 2018)
-
-### Graphics APIs
-
-- **Vulkan**: Khronos Group specification 1.4
-- **GLSL**: OpenGL Shading Language 4.60
-
-### ML Frameworks
-
-- **PyTorch**: Meta AI (Facebook Research)
-- **ONNX**: Open Neural Network Exchange (Microsoft, Facebook, AWS)
-
----
 
 ## License
 
-TBD (MIT or Apache 2.0 for open source release)
+![License](https://img.shields.io/badge/License-MIT-green)
 
----
+## Author
+
+Prathmesh Mathur
+M.Tech Research Project
+
+- GitHub: [@prthm412](https://github.com/prthm412)
+- LinkedIn: [Prathmesh Mathur](https://www.linkedin.com/in/prthmmthr/)
+
+
+Computer Graphics & Machine Learning
+
+
+**Research Question**: Can we reduce memory usage in real-time rendering by 20-30% using learned perceptual quality assessment while maintaining visual fidelity?
+
 
 ## Citation
 
@@ -252,41 +255,4 @@ TBD (MIT or Apache 2.0 for open source release)
 }
 ```
 
-**Learned Perceptual Quality Assessment for Triangle Mesh LOD Selection**
-
-A research project implementing machine learning-based perceptual quality assessment for real-time Level of Detail (LOD) selection in 3D mesh rendering.
-
-## Project Overview
-
-This project aims to reduce memory usage in real-time 3D rendering by using a learned perceptual quality model to intelligently select mesh LOD levels, maintaining visual quality while optimizing resource usage.
-
-## Status
-
-🚧 **In Development** - Phase 1: Foundation
-
-## Tech Stack (tentative as the project progresses)
-
-- **Rendering**: C++17, Vulkan
-- **Machine Learning**: Python, PyTorch, ONNX Runtime
-- **Build System**: CMake
-- **Dependencies**: GLFW, GLM, Assimp, ImGui
-
-## Getting Started
-
-Documentation will be added as the project develops.
-
-## License
-
-TBD
-
-## Author
-
-Computer Graphics & Machine Learning
-
-Prathmesh Mathur
-M.Tech Research Project
-
-- GitHub: [@prthm412](https://github.com/prthm412)
-- LinkedIn: [Prathmesh Mathur](https://www.linkedin.com/in/prthmmthr/)
-
-**Research Question**: Can we reduce memory usage in real-time rendering by 20-30% using learned perceptual quality assessment while maintaining visual fidelity?
+---

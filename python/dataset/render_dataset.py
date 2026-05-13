@@ -89,10 +89,6 @@ def render_one(mesh: pv.PolyData, eye, focus, up) -> np.ndarray:
     pl.camera.up = up
     pl.camera.view_angle = 60.0
 
-    # Zoom so mesh fills ~70% of the frame
-    pl.reset_camera()
-    pl.camera.zoom(1.4)
-
     img = pl.screenshot(return_img=True)
     pl.close()
     return img

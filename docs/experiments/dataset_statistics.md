@@ -1,108 +1,91 @@
-# Dataset Statistics 
+# Dataset Statistics
 
-**Project:** Acuity — Learned Perceptual Quality Assessment for Triangle Mesh LOD Selection
-**Phase:** Data Generation
-**Step:** Dataset Download
-**Last Updated:** May 2026
+## Split Summary
 
----
+| Split | Meshes | Samples | % |
+|-------|--------|---------|---|
+| Train | 10 | 2000 | 71.4% |
+| Val   | 2 | 400 | 14.3% |
+| Test  | 2 | 400 | 14.3% |
+| Total | 14 | 2800 | 100% |
 
-## Image Quality Assessment Datasets
+## Mesh Assignment
 
-### Q-Bench (Primary Annotation Source)
+**Train (10):** Krzeslo_0_LR, armadillo, cheburashka, fandisk, happy, igea, max-planck, stanford-bunny, teapot, woody
 
-| Property | Value |
-|---|---|
-| Paper | Wu et al., ICLR 2024 (Spotlight) — Paper #18 in bibliography |
-| Dev split | 1,495 items |
-| Test split | 1,495 items |
-| Total annotations | 2,990 |
-| Local path | `data/raw/qbench/` |
-| Files | `llvisionqa_qbench_dev.json`, `llvisionqa_qbench_test.json` |
-| Size on disk | ~512 KB (annotation JSONs only) |
-| Usage in Acuity | Pre-trained Q-Bench model used in Step 2.3 to score rendered mesh images |
+**Val (2):** horse, spot
 
-### KADID-10k (Secondary Cross-Validation)
+**Test (2):** cow, homer
 
-| Property | Value |
-|---|---|
-| Source | http://database.mmsp-kn.de/kadid-10k-database.html |
-| Images | 10,125 (81 reference × 25 distortion types × 5 severity levels) |
-| Annotations | DMOS (difference mean opinion scores) |
-| Local path | `data/raw/kadid/` |
-| Files | `dmos.csv` |
-| Size on disk | ~3.2 KB (metadata CSV only) |
-| Usage in Acuity | Cross-validates that Q-Bench scores span meaningful 0–1 range |
+## Quality Score Distribution
 
----
+| Split | Min | Max | Mean | Std |
+|-------|-----|-----|------|-----|
+| Train | 0.7078 | 1.0000 | 0.9840 | 0.0394 |
+| Val | 0.7637 | 1.0000 | 0.9833 | 0.0384 |
+| Test | 0.6636 | 1.0000 | 0.9736 | 0.0512 |
 
-## 3D Mesh Assets
+## Quality Score by LOD Level (Train set)
 
-### Summary
+| LOD | Mean Score | Std |
+|-----|------------|-----|
+| 0 | 1.0000 | 0.0000 |
+| 1 | 0.9933 | 0.0164 |
+| 2 | 0.9851 | 0.0323 |
+| 3 | 0.9751 | 0.0476 |
+| 4 | 0.9666 | 0.0590 |
 
-| Property | Value |
-|---|---|
-| Total meshes | 20 |
-| Local path | `assets/models/` |
-| Manifest | `assets/models/mesh_manifest.csv` (generated in Task 5) |
+## Feature Summary (38 dimensions)
 
-### Mesh Inventory
+| # | Feature | Group | Train Mean | Train Std |
+|---|---------|-------|------------|-----------|
+| 1 | `tri_count_log` | Geometric | 9.1495 | 1.8843 |
+| 2 | `vert_count_log` | Geometric | 8.5003 | 1.8009 |
+| 3 | `surface_area` | Geometric | 111934.2842 | 245690.5926 |
+| 4 | `volume` | Geometric | 1196893.3183 | 2344381.2546 |
+| 5 | `edge_len_mean` | Geometric | 5.7997 | 14.7121 |
+| 6 | `edge_len_std` | Geometric | 5.2927 | 15.2277 |
+| 7 | `bbox_diag` | Geometric | 232.0983 | 345.1657 |
+| 8 | `bbox_x` | Geometric | 107.0625 | 145.6878 |
+| 9 | `bbox_y` | Geometric | 180.5454 | 283.4972 |
+| 10 | `area_variance` | Geometric | 46591.2829 | 228862.3853 |
+| 11 | `normal_var_mean` | Perceptual | 0.2980 | 0.0994 |
+| 12 | `curvature_mean` | Perceptual | 0.0630 | 0.0574 |
+| 13 | `curvature_std` | Perceptual | 0.0918 | 0.0713 |
+| 14 | `detail_density` | Perceptual | 574348.9748 | 1818880.0517 |
+| 15 | `saliency_fraction` | Perceptual | 0.2250 | 0.0750 |
+| 16 | `area_per_tri` | Perceptual | 38.3770 | 140.0656 |
+| 17 | `edge_len_range` | Perceptual | 29.5640 | 73.5308 |
+| 18 | `normal_consistency` | Perceptual | 0.4598 | 0.0513 |
+| 19 | `aspect_ratio` | Perceptual | 0.5777 | 0.3940 |
+| 20 | `vol_sa_ratio` | Perceptual | 4.4723 | 8.9261 |
+| 21 | `lod_tri_ratio` | Perceptual | 0.3913 | 0.3376 |
+| 22 | `tri_reduction` | Perceptual | 0.6087 | 0.3376 |
+| 23 | `log_lod_ratio` | Perceptual | 0.3036 | 0.2256 |
+| 24 | `compactness` | Perceptual | 0.2715 | 0.2306 |
+| 25 | `normal_entropy` | Perceptual | 0.5923 | 0.2270 |
+| 26 | `az_sin` | View-dependent | 0.0000 | 0.7071 |
+| 27 | `az_cos` | View-dependent | -0.0000 | 0.7071 |
+| 28 | `screen_coverage` | View-dependent | 0.2132 | 0.2549 |
+| 29 | `log_distance` | View-dependent | 1.5279 | 0.5489 |
+| 30 | `proj_detail` | View-dependent | 0.0834 | 0.1501 |
+| 31 | `dist_lod_interaction` | View-dependent | 2.6416 | 2.4640 |
+| 32 | `dist_normalised` | View-dependent | 0.5000 | 0.3536 |
+| 33 | `dist_reciprocal` | View-dependent | 0.3794 | 0.2633 |
+| 34 | `proj_area` | View-dependent | 23868.8791 | 86502.3218 |
+| 35 | `lod_adequacy` | View-dependent | 0.3566 | 0.3467 |
+| 36 | `dist_mult` | View-dependent | 4.3400 | 2.8465 |
+| 37 | `az_deg_norm` | View-dependent | 0.4375 | 0.2864 |
+| 38 | `screen_log` | View-dependent | 0.1737 | 0.1919 |
 
-| # | File | Source | Category | Approx. Size |
-|---|---|---|---|---|
-| 1 | stanford-bunny.obj | Stanford / Jacobson | Organic, classic benchmark | 2,352 KB |
-| 2 | armadillo.obj | Stanford / Jacobson | Organic, classic benchmark | 4,527 KB |
-| 3 | lucy.obj | Stanford / Jacobson | Organic, high detail | — |
-| 4 | happy.obj | Stanford / Jacobson | Organic, statue | — |
-| 5 | xyzrgb_dragon.obj | Stanford / Jacobson | Organic, high poly | 11,541 KB |
-| 6 | max-planck.obj | Stanford / Jacobson | Human bust | 4,467 KB |
-| 7 | horse.obj | Stanford / Jacobson | Animal, organic | — |
-| 8 | cow.obj | Jacobson | Animal, organic | — |
-| 9 | fandisk.obj | Jacobson | Hard surface, sharp features | — |
-| 10 | spot.obj | Jacobson / K. Crane | Smooth organic animal | 323 KB |
-| 11 | cheburashka.obj | Jacobson | Smooth cartoon character | 413 KB |
-| 12 | suzanne.obj | Blender / Jacobson | Standard test mesh | 48 KB |
-| 13 | teapot.obj | Jacobson | Classic primitive | 206 KB |
-| 14 | woody.obj | Jacobson | Character figure | 40 KB |
-| 15 | sponza.obj | McGuire Archive | Architectural scene | 5,480 KB |
-| 16 | rungholt.obj | McGuire Archive | Dense urban scene | 2,69,215 KB |
-| 17 | CornellBox-Original.obj | McGuire Archive | Rendering test scene | 3 KB |
-| 18 | AmericanRockSaltMinePinkHalite.obj | Sketchfab CC0 | Rock, irregular hard surface | 15,134 KB |
-| 19 | PRI_TyrannosaurusRexSkull.obj | Sketchfab CC0 | Organic, complex curvature | 42,982 KB |
-| 20 | Krzeslo_0_LR.obj | Sketchfab CC0 | Furniture, hard surface | 9,375 KB |
+## Files
 
-### Diversity Coverage
+| File | Description |
+|------|-------------|
+| `train.csv` | Training split (normalized features + scores) |
+| `val.csv` | Validation split |
+| `test.csv` | Test split |
+| `dataset.h5` | HDF5 format for fast PyTorch loading |
+| `feature_scaler.pkl` | StandardScaler for deployment normalization |
 
-| Category | Meshes |
-|---|---|
-| Organic / character | bunny, armadillo, lucy, happy, dragon, cheburashka, woody, horse, cow |
-| Human / bust | max-planck |
-| Animal | spot, horse, cow |
-| Hard surface / mechanical | fandisk, teapot, chair |
-| Architectural / scene | sponza, rungholt, CornellBox |
-| Natural / irregular | rock salt mine |
-| Paleontological | T-Rex skull |
-
----
-
-## Expected Output After Step 2.2
-
-| Property | Value |
-|---|---|
-| Meshes used | 20 |
-| LOD levels per mesh | 5 (100%, 50%, 25%, 12.5%, 6.25%) |
-| Camera poses per mesh×LOD | 40 (8 angles × 5 distances) |
-| Total rendered images | ~4,000 |
-| Annotation model | Q-Bench pre-trained (Step 2.3) |
-| Feature dimensions | 38 (Step 2.4) |
-| Train / Val / Test split | 70 / 15 / 15 percent by mesh |
-
----
-
-## Citations
-
-- Wu et al., "Q-Bench: A Benchmark for General-Purpose Foundation Models on Low-level Vision", ICLR 2024
-- Lin et al., "KADID-10k: A Large-scale Artificially Distorted IQA Database", QoMEX 2019
-- Alec Jacobson et al., *Common 3D Test Models*, https://github.com/alecjacobson/common-3d-test-models
-- Stanford 3D Scanning Repository, http://graphics.stanford.edu/data/3Dscanrep/
-- Morgan McGuire, *Computer Graphics Archive*, https://casual-effects.com/data, July 2017
+Generated by `python/dataset/finalize_dataset.py`

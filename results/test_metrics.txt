@@ -1,0 +1,32 @@
+=======================================================
+  Acuity — Test Set Evaluation Report
+=======================================================
+
+Model: LODPerceptionNet (best_model.pth)
+Test samples: 400
+
+--- Perceptual Model Metrics ---
+  SRCC : 0.9224   (target: > 0.75)
+  PLCC : 0.9178
+  MSE  : 0.001224
+  MAE  : 0.020360
+  R²   : 0.5326
+
+--- Geometric Baseline Metrics ---
+  SRCC : 0.7145
+  PLCC : 0.4075
+  MSE  : 0.210392
+  MAE  : 0.373588
+  R²   : -79.3446
+
+--- Improvement over Baseline ---
+  SRCC delta : +0.2078
+  PLCC delta : +0.5104
+  MSE delta  : -0.209168
+
+--- Score Range ---
+  Prediction range : [0.5987, 0.9964]
+  Target range     : [0.6636, 1.0000]
+
+Figures saved to results/figures/
+=======================================================

@@ -26,9 +26,12 @@ set(SOURCES
     src/renderer/Pipeline.cpp
     src/renderer/Mesh.cpp
     src/renderer/Camera.cpp
+    src/renderer/OffscreenRenderer.cpp
+    src/renderer/BatchRenderer.cpp
     src/lod/QuadricSimplifier.cpp
     src/lod/LODGenerator.cpp
     src/lod/GeometricLODSelector.cpp
+    src/ml/ONNXInference.cpp
 )
 
 add_executable(Acuity ${SOURCES})
@@ -36,6 +39,7 @@ add_executable(Acuity ${SOURCES})
 target_include_directories(Acuity PRIVATE
     ${Vulkan_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/src
+    $<TARGET_PROPERTY:onnxruntime::onnxruntime,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 target_link_libraries(Acuity PRIVATE

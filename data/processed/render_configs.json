@@ -1,0 +1,401 @@
+{
+  "version": "1.0",
+  "image_width": 512,
+  "image_height": 512,
+  "lod_levels": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "lod_ratios": [
+    1.0,
+    0.5,
+    0.25,
+    0.125,
+    0.0625
+  ],
+  "poses": [
+    {
+      "pose_id": 0,
+      "azimuth_deg": 0,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az000"
+    },
+    {
+      "pose_id": 1,
+      "azimuth_deg": 45,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az045"
+    },
+    {
+      "pose_id": 2,
+      "azimuth_deg": 90,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az090"
+    },
+    {
+      "pose_id": 3,
+      "azimuth_deg": 135,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az135"
+    },
+    {
+      "pose_id": 4,
+      "azimuth_deg": 180,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az180"
+    },
+    {
+      "pose_id": 5,
+      "azimuth_deg": 225,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az225"
+    },
+    {
+      "pose_id": 6,
+      "azimuth_deg": 270,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az270"
+    },
+    {
+      "pose_id": 7,
+      "azimuth_deg": 315,
+      "elevation_deg": 20.0,
+      "distance_mult": 2.0,
+      "distance_label": "very_close",
+      "angle_label": "az315"
+    },
+    {
+      "pose_id": 8,
+      "azimuth_deg": 0,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az000"
+    },
+    {
+      "pose_id": 9,
+      "azimuth_deg": 45,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az045"
+    },
+    {
+      "pose_id": 10,
+      "azimuth_deg": 90,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az090"
+    },
+    {
+      "pose_id": 11,
+      "azimuth_deg": 135,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az135"
+    },
+    {
+      "pose_id": 12,
+      "azimuth_deg": 180,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az180"
+    },
+    {
+      "pose_id": 13,
+      "azimuth_deg": 225,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az225"
+    },
+    {
+      "pose_id": 14,
+      "azimuth_deg": 270,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az270"
+    },
+    {
+      "pose_id": 15,
+      "azimuth_deg": 315,
+      "elevation_deg": 20.0,
+      "distance_mult": 3.0,
+      "distance_label": "close",
+      "angle_label": "az315"
+    },
+    {
+      "pose_id": 16,
+      "azimuth_deg": 0,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az000"
+    },
+    {
+      "pose_id": 17,
+      "azimuth_deg": 45,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az045"
+    },
+    {
+      "pose_id": 18,
+      "azimuth_deg": 90,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az090"
+    },
+    {
+      "pose_id": 19,
+      "azimuth_deg": 135,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az135"
+    },
+    {
+      "pose_id": 20,
+      "azimuth_deg": 180,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az180"
+    },
+    {
+      "pose_id": 21,
+      "azimuth_deg": 225,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az225"
+    },
+    {
+      "pose_id": 22,
+      "azimuth_deg": 270,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az270"
+    },
+    {
+      "pose_id": 23,
+      "azimuth_deg": 315,
+      "elevation_deg": 20.0,
+      "distance_mult": 4.0,
+      "distance_label": "medium",
+      "angle_label": "az315"
+    },
+    {
+      "pose_id": 24,
+      "azimuth_deg": 0,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az000"
+    },
+    {
+      "pose_id": 25,
+      "azimuth_deg": 45,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az045"
+    },
+    {
+      "pose_id": 26,
+      "azimuth_deg": 90,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az090"
+    },
+    {
+      "pose_id": 27,
+      "azimuth_deg": 135,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az135"
+    },
+    {
+      "pose_id": 28,
+      "azimuth_deg": 180,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az180"
+    },
+    {
+      "pose_id": 29,
+      "azimuth_deg": 225,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az225"
+    },
+    {
+      "pose_id": 30,
+      "azimuth_deg": 270,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az270"
+    },
+    {
+      "pose_id": 31,
+      "azimuth_deg": 315,
+      "elevation_deg": 20.0,
+      "distance_mult": 5.0,
+      "distance_label": "far",
+      "angle_label": "az315"
+    },
+    {
+      "pose_id": 32,
+      "azimuth_deg": 0,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az000"
+    },
+    {
+      "pose_id": 33,
+      "azimuth_deg": 45,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az045"
+    },
+    {
+      "pose_id": 34,
+      "azimuth_deg": 90,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az090"
+    },
+    {
+      "pose_id": 35,
+      "azimuth_deg": 135,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az135"
+    },
+    {
+      "pose_id": 36,
+      "azimuth_deg": 180,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az180"
+    },
+    {
+      "pose_id": 37,
+      "azimuth_deg": 225,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az225"
+    },
+    {
+      "pose_id": 38,
+      "azimuth_deg": 270,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az270"
+    },
+    {
+      "pose_id": 39,
+      "azimuth_deg": 315,
+      "elevation_deg": 20.0,
+      "distance_mult": 7.0,
+      "distance_label": "very_far",
+      "angle_label": "az315"
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Krzeslo_0_LR",
+      "path": "assets/models/sketchfab/Krzeslo_0_LR.obj"
+    },
+    {
+      "name": "armadillo",
+      "path": "assets/models/stanford/armadillo.obj"
+    },
+    {
+      "name": "cheburashka",
+      "path": "assets/models/stanford/cheburashka.obj"
+    },
+    {
+      "name": "cow",
+      "path": "assets/models/stanford/cow.obj"
+    },
+    {
+      "name": "fandisk",
+      "path": "assets/models/stanford/fandisk.obj"
+    },
+    {
+      "name": "happy",
+      "path": "assets/models/stanford/happy.obj"
+    },
+    {
+      "name": "homer",
+      "path": "assets/models/stanford/homer.obj"
+    },
+    {
+      "name": "horse",
+      "path": "assets/models/stanford/horse.obj"
+    },
+    {
+      "name": "igea",
+      "path": "assets/models/stanford/igea.obj"
+    },
+    {
+      "name": "max-planck",
+      "path": "assets/models/stanford/max-planck.obj"
+    },
+    {
+      "name": "spot",
+      "path": "assets/models/stanford/spot.obj"
+    },
+    {
+      "name": "stanford-bunny",
+      "path": "assets/models/stanford/stanford-bunny.obj"
+    },
+    {
+      "name": "teapot",
+      "path": "assets/models/stanford/teapot.obj"
+    },
+    {
+      "name": "woody",
+      "path": "assets/models/stanford/woody.obj"
+    }
+  ],
+  "total_renders": 2800,
+  "notes": "40 poses = 8 angles x 5 distances. Output naming: {mesh_name}_lod{lod}_{angle_label}_{distance_label}.png"
+}

@@ -33,6 +33,7 @@ set(SOURCES
     src/lod/GeometricLODSelector.cpp
     src/ml/ONNXInference.cpp
     src/lod/FeatureExtractor.cpp
+    src/lod/PerceptualLODSelector.cpp
 )
 
 add_executable(Acuity ${SOURCES})

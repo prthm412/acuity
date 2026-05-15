@@ -19,11 +19,12 @@
 #include "renderer/VulkanContext.h"
 #include "renderer/BatchRenderer.h"
 #include "renderer/OffscreenRenderer.h"
-#include "lod/PerceptualLODSelector.h"
+#include "renderer/FrustumCuller.h"
 
 #include "lod/LODMesh.h"
 #include "lod/LODGenerator.h"
 #include "lod/GeometricLODSelector.h"
+#include "lod/PerceptualLODSelector.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -41,6 +42,7 @@ struct PushConstantData {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 projection;
+    int       lodVisualization; // 1: show LOD colors, 0: normal grey
 };
 
 // Global state (accessed in GLFW callbacks)
@@ -101,6 +103,7 @@ class AcuityApp {
         acuity::GeometricLODSelector lodSelector;
         int lodMethod = 0;  // 0: Geometric, 1: Perceptual, 2: Oracle
         acuity::PerceptualLODSelector perceptualSelector;
+        acuity::FrustumCuller frustumCuller;
 
         // Per-frame synchronization objects
         std::vector<VkSemaphore> imageAvailableSemaphores;
@@ -296,6 +299,31 @@ class AcuityApp {
             glm::vec3 meshPos = glm::vec3(0.0f);
             currentDistance   = glm::length(camPos - meshPos);
 
+            float meshRadius  = 0.0f;
+            for (const auto& v : lodMesh.levels[0].mesh.vertices) {
+                float d = glm::length(v.position - meshPos);
+                if (d > meshRadius) meshRadius = d;
+            }
+
+            if (!frustumCuller.isSphereVisible(meshPos, meshRadius)) {
+                currentLODLevel = static_cast<int>(lodMesh.levels.size()) - 1;
+                return;
+            }
+
+            // Update frustum and check visibility
+            float aspectRatio = static_cast<float>(ctx.swapchainExtent.width) /
+                                static_cast<float>(ctx.swapchainExtent.height);
+            glm::mat4 vp = g_camera.getProjectionMatrix(aspectRatio) *
+                        g_camera.getViewMatrix();
+            frustumCuller.update(vp);
+
+            // Bounding radius of mesh at LOD0
+            if (!frustumCuller.isSphereVisible(meshPos, meshRadius)) {
+                // Mesh is outside frustum — use lowest detail LOD
+                currentLODLevel = static_cast<int>(lodMesh.levels.size()) - 1;
+                return;
+            }
+
             if (lodMethod == 0) {
                 // Geometric: distance-based
                 currentLODLevel = lodSelector.selectLOD(camPos, meshPos, lodMesh);
@@ -391,6 +419,7 @@ class AcuityApp {
             pc.model      = glm::mat4(1.0f);
             pc.view       = g_camera.getViewMatrix();
             pc.projection = g_camera.getProjectionMatrix(aspect);
+            pc.lodVisualization = g_lodVisualization ? 1 : 0;
             vkCmdPushConstants(cmd, pipeline.pipelineLayout,
                             VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pc);
 
@@ -473,7 +502,12 @@ class AcuityApp {
 
         void recreateSwapchain() {
             int w = 0, h = 0;
-            while (w == 0 || h == 0) { glfwGetFramebufferSize(window, &w, &h); glfwWaitEvents(); }
+            glfwGetFramebufferSize(window, &w, &h);
+            while (w == 0 || h == 0) {
+                glfwGetFramebufferSize(window, &w, &h);
+                glfwWaitEvents();
+            }
+            g_framebufferResized = false;  // ← add this
             vkDeviceWaitIdle(ctx.device);
             renderPass.recreate(ctx);
             pipeline.destroy(ctx.device);

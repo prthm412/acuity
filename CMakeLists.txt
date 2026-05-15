@@ -34,6 +34,7 @@ set(SOURCES
     src/ml/ONNXInference.cpp
     src/lod/FeatureExtractor.cpp
     src/lod/PerceptualLODSelector.cpp
+    src/renderer/FrustumCuller.cpp
 )
 
 add_executable(Acuity ${SOURCES})

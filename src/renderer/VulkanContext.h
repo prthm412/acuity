@@ -37,6 +37,7 @@ namespace acuity {
             std::vector<VkImage>    swapchainImages;
             std::vector<VkImageView>swapchainImageViews;
             VkCommandPool           commandPool     = VK_NULL_HANDLE;
+            uint32_t                graphicsQueueFamily = 0; // cached for OffscreenRenderer
 
             // Depth buffer - needed for correct depth ordering of triangles
             VkImage         depthImage          = VK_NULL_HANDLE;

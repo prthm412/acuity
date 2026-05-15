@@ -1,0 +1,86 @@
+================================================================================
+ACUITY — Performance Benchmark Report
+================================================================================
+
+System Configuration:
+  GPU:  NVIDIA GeForce RTX 4060 Laptop GPU
+  CPU:  13 Gen Intel(R) Core(TM) i9-13980HX 
+  RAM:  16.0 GB (Speed: 5600 MT/s)
+  OS:   Windows 11
+  Build: Release (MSVC 18, C++17, Ninja)
+
+--------------------------------------------------------------------------------
+ONNX Model Inference Latency (Python)
+--------------------------------------------------------------------------------
+  Model:        lod_perception.onnx
+  Feature dim:  38
+  Batch size:   1
+  Warmup runs:  50
+  Timed runs:   1000
+  Mean latency: 0.0140 ms
+  Target:       < 1.0 ms
+  Result:       PASSED (71x faster than target)
+
+--------------------------------------------------------------------------------
+ONNX Model Inference Latency (C++ ONNX Runtime)
+--------------------------------------------------------------------------------
+  Model:        lod_perception.onnx
+  Feature dim:  38
+  Batch size:   1
+  Warmup runs:  50
+  Timed runs:   1000
+  Mean latency: 0.0062 ms
+  Target:       < 1.0 ms
+  Result:       PASSED (161x faster than target)
+
+--------------------------------------------------------------------------------
+LOD Selection Overhead (Real-time Renderer)
+--------------------------------------------------------------------------------
+  Mesh:         Sphere (2048 triangles at LOD0)
+  Method:       Geometric (distance-based)
+  FPS:          ~12,000 - 13,000
+  Target:       >= 60 FPS
+  Result:       PASSED
+
+  Method:       Perceptual (ONNX-based)
+  FPS:          ~12,000 - 13,000
+  FPS drop:     0 (no measurable overhead)
+  Target:       >= 60 FPS
+  Result:       PASSED
+
+  Method:       Oracle (LOD0 always)
+  FPS:          ~12,000 - 13,000
+  Result:       PASSED
+
+--------------------------------------------------------------------------------
+Batch Inference (C++ ONNX Runtime)
+--------------------------------------------------------------------------------
+  Batch sizes tested: 1, 5 (NUM_LOD_LEVELS)
+  Consistency:  Batch vs individual max diff = 0.00e+00
+  Result:       PASSED
+
+--------------------------------------------------------------------------------
+Temporal Stability
+--------------------------------------------------------------------------------
+  Stability frames: 10 (default)
+  LOD switching:    Hysteresis applied — no popping observed
+  Result:           PASSED
+
+--------------------------------------------------------------------------------
+Cache Performance
+--------------------------------------------------------------------------------
+  Cache key:    meshId + quantized distance (0.5 unit buckets)
+  Cache hit:    Returns stored LOD, skips inference entirely
+  Overhead:     unordered_map lookup ~O(1)
+
+--------------------------------------------------------------------------------
+Notes
+--------------------------------------------------------------------------------
+  - NVIDIA Nsight GPU profiling not performed: system exceeds all
+    performance targets by >100x on test mesh, profiling deferred
+    to Phase 5 multi-mesh benchmarking with complex scenes
+  - Frustum culling deferred to Phase 5: single-mesh scene does
+    not benefit from culling
+  - All targets from final-workflow.md met or exceeded
+
+================================================================================

@@ -1,0 +1,57 @@
+======================================================================
+ONNX Export Verification Report -- LODPerceptionNet
+======================================================================
+
+Model Information:
+  PyTorch checkpoint:   data/models/best_model.pth
+  ONNX export:          data/models/lod_perception.onnx
+  Opset version:        14
+  Input name:           features [batch_size, 38]
+  Output name:          quality_score [batch_size, 1]
+
+-- Numerical Verification ------------------------------------------
+  Test samples:         5 random inputs
+  Max PyTorch vs ONNX difference:  5.96e-08
+  Mean PyTorch vs ONNX difference: 3.45e-08
+  Tolerance threshold:  1e-05
+  Result:               PASSED -- outputs match within tolerance
+
+-- Inference Latency Benchmark (Python ONNX Runtime) ---------------
+  Warmup runs:          50
+  Timed runs:           1000
+  Mean latency:         0.0140 ms
+  Target:               < 1.0 ms
+  Result:               PASSED (71x faster than target)
+
+-- Inference Latency Benchmark (C++ ONNX Runtime) ------------------
+  Warmup runs:          50
+  Timed runs:           1000
+  Mean latency:         0.0062 ms
+  Target:               < 1.0 ms
+  Result:               PASSED (161x faster than target)
+
+-- Graph Optimization -----------------------------------------------
+  do_constant_folding:  True
+  Optimization level:   ORT_ENABLE_ALL (C++ session)
+  Effect:               Constants folded at export time,
+                        ops fused at session load time
+
+-- CPU and GPU Testing ----------------------------------------------
+  CPU inference:        Tested and verified (Python + C++)
+  GPU inference:        Not tested -- onnxruntime-gpu not installed.
+                        C++ ONNX Runtime uses CPU provider which is
+                        sufficient for <1ms target. GPU provider
+                        would add overhead for such a small model.
+
+-- Integration Tests (Python) ---------------------------------------
+  test_model_loads:                PASSED
+  test_input_output_names:         PASSED
+  test_input_shape:                PASSED
+  test_single_inference:           PASSED
+  test_batch_inference_consistency:PASSED
+  test_deterministic:              PASSED
+  test_latency:                    PASSED
+  test_lod_ordering:               PASSED
+  Total:                           8/8 passed
+
+======================================================================

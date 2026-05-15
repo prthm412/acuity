@@ -1,9 +1,50 @@
+"""
+python/training/model.py
+
+Defines LODPerceptionNet: a lightweight MLP that predicts perceptual
+quality score (0-1) from a 38-dimensional feature vector.
+
+Architecture:
+    Input  : 38 features (geometric + perceptual + view-dependent)
+    Hidden : 256 → 128 → 64 → 32 neurons, each with ReLU + Dropout
+    Output : 1 neuron with Sigmoid activation (score in [0, 1])
+
+Design decisions:
+  - MLP (not CNN/Transformer): input is a structured 38D feature vector,
+    not raw pixels. MLPs are the correct architecture for tabular/feature data.
+  - Sigmoid output: quality scores are in [0, 1] by construction (from LPIPS),
+    so Sigmoid ensures predictions stay in that range.
+  - Dropout (0.3): the dataset is small (2000 training samples). Dropout
+    prevents overfitting by randomly zeroing neurons during training.
+  - BatchNorm after each hidden layer: stabilizes training by normalizing
+    activations, allowing higher learning rates and faster convergence.
+  - ~25,000 parameters: intentionally lightweight. Must run in under 1ms
+    at inference time inside the C++ renderer (Phase 4).
+
+Custom loss function (PerceptualLODLoss):
+    Combines three terms:
+    1. MSE loss       — penalizes absolute prediction error
+    2. Ranking loss   — penalizes incorrect ordering (LOD 2 must score
+                        lower than LOD 1 for the same mesh/viewpoint)
+    3. Correlation    — maximizes Spearman rank correlation between
+                        predictions and ground truth (directly optimises SRCC)
+    The ranking and correlation terms teach the model the ordinal structure
+    of the data — it must not just predict scores but predict them in the
+    right relative order, which is what LOD selection actually needs.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 # Model
 class LODPerceptionNet(nn.Module):
+    """
+    Lightweight MLP for perceptual LOD quality prediction.
+
+    Input:  38-dimensional normalized feature vector
+    Output: scalar quality score in [0, 1]
+    """
     def __init__(self, input_dim: int = 38, dropout: float = 0.3):
         super().__init__()
 
@@ -53,6 +94,27 @@ class LODPerceptionNet(nn.Module):
 # Loss-funtion
 
 class PerceptualLODLoss(nn.Module):
+    """
+    Combined loss function with three terms:
+
+    1. MSE loss (weight: alpha):
+       Standard mean squared error between predicted and true scores.
+       Penalizes large absolute prediction errors.
+
+    2. Ranking loss (weight: beta):
+       For each pair of samples in the batch, if ground truth says
+       score_i > score_j, predictions should also satisfy pred_i > pred_j.
+       Uses margin ranking loss with margin=0.05 — predictions must be
+       separated by at least 0.05 to count as correctly ranked.
+       This teaches the model the ordinal structure: LOD 0 > LOD 1 > LOD 2...
+
+    3. Correlation loss (weight: gamma):
+       1 - Pearson correlation between predictions and targets in the batch.
+       Directly encourages the model to rank all samples correctly relative
+       to each other, which directly optimises SRCC (the target metric).
+
+    Default weights: alpha=0.6, beta=0.2, gamma=0.2
+    """
     def __init__(self, alpha: float = 0.6, beta: float = 0.2, gamma: float = 0.2):
         super().__init__()
         self.alpha = alpha

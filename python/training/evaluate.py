@@ -1,3 +1,23 @@
+"""
+python/training/evaluate.py
+
+Loads the best trained model and evaluates it on the held-out test set.
+Computes all target metrics, generates plots, and writes a report.
+
+Metrics computed:
+    SRCC  — Spearman Rank Correlation Coefficient (primary target: > 0.75)
+    PLCC  — Pearson Linear Correlation Coefficient
+    MSE   — Mean Squared Error
+    MAE   — Mean Absolute Error
+    R²    — Coefficient of determination
+
+Outputs:
+    results/test_predictions.csv   — per-sample predictions vs ground truth
+    results/test_metrics.txt       — all metrics in plain text
+    results/figures/               — prediction plot, error distribution,
+                                     per-LOD breakdown, residuals
+"""
+
 import torch
 import numpy as np
 import pandas as pd

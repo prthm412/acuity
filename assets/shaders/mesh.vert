@@ -9,6 +9,7 @@ layout(push_constant) uniform PushConstants {
     mat4 model;         // object-to-world transform
     mat4 view;          // world-to-camera transform
     mat4 projection;    // camera-to-clip transform (perspective)
+    int  lodVisualization;
 } pc;
 
 // Outputs (passed to fragment shader)
@@ -25,5 +26,11 @@ void main() {
     // Pass to fragment shader
     fragWorldPos = worldPos.xyz;
     fragNormal   = mat3(transpose(inverse(pc.model))) * inNormal;
-    fragColor    = inColor;
+    
+    // In normal mode use flat grey, in LOD mode use baked vertex color
+    if (pc.lodVisualization == 1) {
+        fragColor = inColor;
+    } else {
+        fragColor = vec3(0.35, 0.35, 0.35);
+    }
 }

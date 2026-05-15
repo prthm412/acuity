@@ -1,0 +1,43 @@
+======================================================================
+ERROR ANALYSIS REPORT -- LODPerceptionNet
+======================================================================
+
+-- Error Distribution ----------------------------------------------
+  Total test samples:          400
+  Mean absolute error:         0.020360
+  Median absolute error:       0.011039
+  Std absolute error:          0.028451
+  Max absolute error:          0.195661
+  Min absolute error:          0.000486
+
+  % predictions within 0.05:  92.2%
+  % predictions within 0.10:  96.5%
+  % predictions within 0.20:  100.0%
+
+-- Failure Cases ---------------------------------------------------
+  Failure threshold:           |error| >= 0.1
+  Failure count:               14
+  Failure rate:                3.5%
+
+  Top 10 worst predictions:
+  #      Prediction  Ground Truth  Abs Error
+  ---------------------------------------------
+  1        0.600630      0.796290   0.195661
+  2        0.598663      0.789071   0.190408
+  3        0.618890      0.792441   0.173551
+  4        0.719294      0.884359   0.165065
+  5        0.704589      0.854594   0.150005
+  6        0.702253      0.851657   0.149404
+  7        0.692255      0.835095   0.142840
+  8        0.878600      0.739954   0.138645
+  9        0.693009      0.822148   0.129139
+  10       0.940861      0.823554   0.117307
+
+-- Error Analysis --------------------------------------------------
+  Prediction bias:             slight under-prediction (-0.0178)
+  Error normality (Shapiro-Wilk p): 0.0000
+
+-- Conclusion ------------------------------------------------------
+  Model performance is GOOD. Failure rate below 5%.
+
+======================================================================

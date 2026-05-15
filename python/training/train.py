@@ -1,3 +1,27 @@
+"""
+python/training/train.py
+
+Trains LODPerceptionNet on the Phase 2 dataset.
+
+Pipeline:
+    1. Load train.csv and val.csv (normalized 38D features + quality scores)
+    2. PyTorch Dataset wraps the HDF5 file for fast batch loading
+    3. Training loop runs for up to 100 epochs with early stopping
+    4. Weights & Biases logs all metrics for experiment tracking
+    5. Best model (lowest val loss) is saved as data/models/best_model.pth
+
+Key design decisions:
+  - HDF5 loading: faster than CSV for repeated epoch access
+  - Split by mesh (done in Phase 2): no data leakage — val meshes never
+    appeared in training
+  - Early stopping (patience=15): stops training if val loss does not
+    improve for 15 consecutive epochs, prevents overfitting
+  - LR scheduler (ReduceLROnPlateau): halves learning rate when val loss
+    plateaus — allows fine-grained convergence after initial learning
+  - Gradient clipping (max_norm=1.0): prevents exploding gradients,
+    important with the combined ranking + correlation loss
+"""
+
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -40,6 +64,20 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 # Dataset
 
 class LODDataset(Dataset):
+    """
+    PyTorch Dataset that reads features and quality scores from the HDF5 file.
+
+    HDF5 layout (written by finalize_dataset.py):
+        /train/features  : (2000, 38) float32
+        /train/labels    : (2000,)    float32
+        /val/features    : (400,  38) float32
+        /val/labels      : (400,)     float32
+        /test/features   : (400,  38) float32
+        /test/labels     : (400,)     float32
+
+    Loads the entire split into memory at init (dataset is small enough).
+    This avoids repeated HDF5 reads during training, which would be slow.
+    """
 
     def __init__(self, hdf5_path: Path, split: str):
         """
@@ -69,12 +107,22 @@ class LODDataset(Dataset):
 # Metrics
 
 def spearman_rcc(pred: np.ndarray, target: np.ndarray) -> float:
+    """
+    Spearman Rank Correlation Coefficient (SRCC).
+    Measures monotonic relationship between predictions and targets.
+    Target metric: SRCC > 0.75.
+    Range: [-1, 1], higher is better.
+    """
     from scipy.stats import spearmanr
     corr, _ = spearmanr(pred, target)
     return float(corr)
 
 
 def pearson_lcc(pred: np.ndarray, target: np.ndarray) -> float:
+    """
+    Pearson Linear Correlation Coefficient (PLCC).
+    Measures linear relationship. Companion metric to SRCC.
+    """
     corr = np.corrcoef(pred, target)[0, 1]
     return float(corr)
 
@@ -89,6 +137,15 @@ def run_epoch(
     device:    torch.device,
     training:  bool,
 ) -> tuple[float, dict]:
+    """
+    Run one full pass over the dataloader.
+    If training=True, computes gradients and updates weights.
+    If training=False (validation), runs in no_grad mode.
+
+    Returns:
+        mean_loss: average total loss over all batches
+        metrics:   dict with mean MSE, rank, corr loss components
+    """
     model.train(training)
     total_loss  = 0.0
     components  = {"mse": 0.0, "rank": 0.0, "corr": 0.0}

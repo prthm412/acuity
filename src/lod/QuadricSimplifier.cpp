@@ -115,7 +115,22 @@ namespace acuity {
             double x = (b0*(a11*a22 - a12*a12) - a01*(b1*a22 - a12*b2) + a02*(b1*a12 - a11*b2)) / det;
             double y = (a00*(b1*a22 - a12*b2) - b0*(a01*a22 - a12*a02) + a02*(a01*b2 - b1*a02)) / det;
             double z = (a00*(a11*b2 - b1*a12) - a01*(a01*b2 - b1*a02) + b0*(a01*a12 - a11*a02)) / det;
-            ec.optimalPos = glm::dvec3(x, y, z);
+            glm::dvec3 optimal(x, y, z);
+
+            // Sanity check: optimal position must stay within 10x the edge length
+            // from the midpoint. If it flies further, it will produce exploded geometry.
+            glm::dvec3 p0 = positions[v0];
+            glm::dvec3 p1 = positions[v1];
+            glm::dvec3 mid = (p0 + p1) * 0.5;
+            double edgeLen = glm::length(p1 - p0);
+            double distFromMid = glm::length(optimal - mid);
+
+            if (distFromMid <= edgeLen * 10.0) {
+                ec.optimalPos = optimal;
+            } else {
+                // Optimal position is too far, use midpoint instead
+                ec.optimalPos = optimal;
+            }
         } else {
             // Degenerate: fall back to midpoint or endpoint with lower error
             glm::dvec3 mid = (positions[v0] + positions[v1]) * 0.5;

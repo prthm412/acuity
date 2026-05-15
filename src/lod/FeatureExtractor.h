@@ -5,7 +5,7 @@
 #include <string>
 #include <glm/glm.hpp>
 
-namespace Acuity {
+namespace acuity {
     static constexpr int TOTAL_FEATURES      = 38;
     static constexpr int GEOMETRIC_FEATURES  = 10;
     static constexpr int PERCEPTUAL_FEATURES = 15;

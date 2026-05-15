@@ -9,7 +9,7 @@
 #include <iostream>
 #include <stdexcept>
 
-namespace Acuity {
+namespace acuity {
     // Constructor
     FeatureExtractor::FeatureExtractor() {
         m_mean.fill(0.0f);

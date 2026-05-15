@@ -1,5 +1,4 @@
 // ============================================================
-// Acuity - 1.4 Basic LOD Selector
 // This file verifies all dependencies are linked correctly.
 // ============================================================
 
@@ -18,6 +17,9 @@
 #include "renderer/Pipeline.h"
 #include "renderer/RenderPass.h"
 #include "renderer/VulkanContext.h"
+#include "renderer/BatchRenderer.h"
+#include "renderer/OffscreenRenderer.h"
+#include "lod/PerceptualLODSelector.h"
 
 #include "lod/LODMesh.h"
 #include "lod/LODGenerator.h"
@@ -97,6 +99,8 @@ class AcuityApp {
         acuity::Pipeline        pipeline;
         acuity::LODMesh         lodMesh;
         acuity::GeometricLODSelector lodSelector;
+        int lodMethod = 0;  // 0: Geometric, 1: Perceptual, 2: Oracle
+        acuity::PerceptualLODSelector perceptualSelector;
 
         // Per-frame synchronization objects
         std::vector<VkSemaphore> imageAvailableSemaphores;
@@ -104,6 +108,9 @@ class AcuityApp {
         std::vector<VkFence>     inFlightFences;
         std::vector<VkCommandBuffer> commandBuffers;
         uint32_t currentFrame = 0;
+
+        std::vector<acuity::MeshData> m_cachedLODMeshDatas;
+        bool m_lodMeshDatasCached = false;
 
         // ImGui descriptor pool
         VkDescriptorPool imguiPool = VK_NULL_HANDLE;
@@ -157,6 +164,12 @@ class AcuityApp {
 
             lastFpsTime = std::chrono::steady_clock::now();
             std::cout << "[App] LOD systems ready. Controls: LMB=orbit, MMB=pan, scroll=zoom, R=reset" << std::endl;
+
+            if (perceptualSelector.init("../data/models/lod_perception.onnx", "../data/processed/feature_scaler.txt")) {
+                std::cout << "[App] Perceptual LOD selector ready\n";
+            } else {
+                std::cout << "[App] Perceptual selector failed, falling back to geometric\n";
+            }
         }
 
         // Generate procedural sphere at multiple LOD levls
@@ -279,11 +292,36 @@ class AcuityApp {
         }
 
         void updateLOD() {
-            // Select LOD based on camera distance to origin (where our mesh sits)
-            glm::vec3 camPos   = g_camera.getPosition();
-            glm::vec3 meshPos  = glm::vec3(0.0f);
-            currentDistance    = glm::length(camPos - meshPos);
-            currentLODLevel    = lodSelector.selectLOD(camPos, meshPos, lodMesh);
+            glm::vec3 camPos  = g_camera.getPosition();
+            glm::vec3 meshPos = glm::vec3(0.0f);
+            currentDistance   = glm::length(camPos - meshPos);
+
+            if (lodMethod == 0) {
+                // Geometric: distance-based
+                currentLODLevel = lodSelector.selectLOD(camPos, meshPos, lodMesh);
+
+            } else if (lodMethod == 1) {
+                if (perceptualSelector.isReady()) {
+                    acuity::ViewData view;
+                    view.cameraPos      = camPos;
+                    view.meshCenter     = meshPos;
+                    view.distance       = currentDistance;
+                    view.azimuth        = g_camera.theta;
+                    view.elevation      = g_camera.phi;
+                    view.screenCoverage = std::max(0.01f,
+                                        1.0f / (1.0f + currentDistance * 0.1f));
+
+                    currentLODLevel = perceptualSelector.selectLOD(
+                        lodMesh.name, m_cachedLODMeshDatas, view);
+
+                } else {
+                    currentLODLevel = lodSelector.selectLOD(camPos, meshPos, lodMesh);
+                }
+
+            } else {
+                // Oracle: always LOD 0 (highest detail)
+                currentLODLevel = 0;
+            }
         }
 
         void drawFrame() {
@@ -311,19 +349,17 @@ class AcuityApp {
             si.pCommandBuffers      = &cmd;
             si.signalSemaphoreCount = 1;
             si.pSignalSemaphores    = &renderFinishedSemaphores[currentFrame];
-
             if (vkQueueSubmit(ctx.graphicsQueue, 1, &si, inFlightFences[currentFrame]) != VK_SUCCESS)
                 throw std::runtime_error("Failed to submit draw command buffer");
 
-            VkPresentInfoKHR presentInfo{};
-            presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-            presentInfo.waitSemaphoreCount = 1;
-            presentInfo.pWaitSemaphores    = &renderFinishedSemaphores[currentFrame];
-            presentInfo.swapchainCount     = 1;
-            presentInfo.pSwapchains        = &ctx.swapchain;
-            presentInfo.pImageIndices      = &imageIndex;
-
-            result = vkQueuePresentKHR(ctx.presentQueue, &presentInfo);
+            VkPresentInfoKHR pi{};
+            pi.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            pi.waitSemaphoreCount = 1;
+            pi.pWaitSemaphores    = &renderFinishedSemaphores[currentFrame];
+            pi.swapchainCount     = 1;
+            pi.pSwapchains        = &ctx.swapchain;
+            pi.pImageIndices      = &imageIndex;
+            result = vkQueuePresentKHR(ctx.presentQueue, &pi);
             if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR
                 || g_framebufferResized) {
                 g_framebufferResized = false;
@@ -380,27 +416,46 @@ class AcuityApp {
             ImGui::NewFrame();
 
             ImGui::SetNextWindowPos ({10, 10},  ImGuiCond_Always);
-            ImGui::SetNextWindowSize({260, 200}, ImGuiCond_Always);
+            ImGui::SetNextWindowSize({280, 300}, ImGuiCond_Always);
             ImGui::Begin("Acuity Debug", nullptr,
                         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
 
-            ImGui::Text("FPS:       %.1f", fps);
+            // LOD method switcher
+            ImGui::Text("LOD Method:");
+            ImGui::RadioButton("Geometric",  &lodMethod, 0); ImGui::SameLine();
+            ImGui::RadioButton("Perceptual", &lodMethod, 1); ImGui::SameLine();
+            ImGui::RadioButton("Oracle",     &lodMethod, 2);
+
             ImGui::Separator();
-            ImGui::Text("LOD Level: %d / %d", currentLODLevel,
-                        int(lodMesh.levelCount()) - 1);
-            ImGui::Text("Triangles: %u", level.triangleCount);
+            ImGui::Text("FPS:       %.1f", fps);
+            ImGui::Text("LOD Level: %d", currentLODLevel);
+            ImGui::Text("Triangles: %u", lodMesh.levels[currentLODLevel].triangleCount);
             ImGui::Text("Distance:  %.2f", currentDistance);
-            ImGui::Text("Ratio:     %.1f%%", level.targetRatio * 100.0f);
             ImGui::Separator();
 
-            // LOD level breakdown
-            for (int i = 0; i < int(lodMesh.levelCount()); ++i) {
+            // LOD levels list
+            for (int i = 0; i < (int)lodMesh.levelCount(); ++i) {
                 bool active = (i == currentLODLevel);
                 if (active) ImGui::PushStyleColor(ImGuiCol_Text, {0.3f,1.0f,0.3f,1.0f});
                 ImGui::Text("  LOD%d: %u tris (%.1f%%)", i,
                             lodMesh.levels[i].triangleCount,
                             lodMesh.levels[i].targetRatio * 100.0f);
                 if (active) ImGui::PopStyleColor();
+            }
+
+            // Perceptual scores
+            if (lodMethod == 1 && perceptualSelector.isReady()) {
+                ImGui::Separator();
+                ImGui::Text("Perceptual Scores:");
+                for (const auto& c : perceptualSelector.getLastCandidates()) {
+                    bool sel = (c.lodLevel == currentLODLevel);
+                    if (sel) ImGui::PushStyleColor(ImGuiCol_Text, {0.3f,1.0f,0.3f,1.0f});
+                    ImGui::Text("  LOD%d: %.4f", c.lodLevel, c.qualityScore);
+                    if (sel) ImGui::PopStyleColor();
+                }
+                float t = perceptualSelector.getThreshold();
+                if (ImGui::SliderFloat("Threshold", &t, 0.0f, 1.0f))
+                    perceptualSelector.setThreshold(t);
             }
 
             ImGui::Separator();
@@ -447,7 +502,63 @@ class AcuityApp {
 };
 
 int main(int argc, char* argv[]) {
-    std::string meshPath = (argc > 1) ? argv[1] : "";
+    // Check for --batch flag to run headless batch rendering
+    bool batchMode = false;
+    std::string meshPath = "";
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--batch") batchMode = true;
+        else meshPath = argv[i];
+    }
+
+    if (batchMode) {
+        // Batch mode: initialize Vulkan without a window, render all meshes
+        // to data/processed/rendered_images/ and exit.
+        std::cout << "[Acuity] Starting batch render mode..." << std::endl;
+        try {
+            glfwInit();
+            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+            GLFWwindow* hiddenWindow = glfwCreateWindow(1, 1, "Acuity Batch", nullptr, nullptr);
+
+            acuity::VulkanContext ctx;
+            ctx.init(hiddenWindow);
+
+            // OffscreenRenderer creates its own render pass internally.
+            // Pipeline needs a render pass to compile shaders against
+            // Creating a temporary OffscreenRenderer just to get its
+            // render pass for pipeline initialization.
+            acuity::OffscreenRenderer tempOsr;
+            tempOsr.init(ctx, 512, 512);
+
+            acuity::Pipeline pipeline;
+            pipeline.init(ctx, tempOsr.renderPass,
+                          "build/shaders/mesh.vert.spv",
+                          "build/shaders/mesh.frag.spv");
+
+            acuity::BatchRenderer batchRenderer;
+            std::string configPath = "data/processed/render_configs.json";
+            std::string outputDir  = "data/processed/rendered_images";
+
+            auto stats = batchRenderer.run(ctx, pipeline, configPath, outputDir);
+
+            std::cout << "[Acuity] Batch complete: "
+                      << stats.totalRendered << " images rendered, "
+                      << stats.totalSkipped  << " skipped, "
+                      << stats.totalTimeMs / 1000.0f << "s total" << std::endl;
+
+            tempOsr.destroy(ctx.device);
+            pipeline.destroy(ctx.device);
+            ctx.destroy();
+            glfwDestroyWindow(hiddenWindow);
+            glfwTerminate();
+        } catch (const std::exception& e) {
+            std::cerr << "[Fatal] " << e.what() << std::endl;
+            return 1;
+        }
+        return 0;
+    }
+
+    // Normal iterative mode
     AcuityApp app;
     try {
         app.run(meshPath);

@@ -5,6 +5,9 @@
 #include <assimp/postprocess.h>
 #include <iostream>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 
 namespace acuity {
     // constexpr arrays for older compilers
@@ -28,16 +31,35 @@ namespace acuity {
 
         auto totalStart = std::chrono::steady_clock::now();
 
+        // Adaptive LOD ratios: prevent over-simplification on high-poly meshes
+        // Standard ratios work for meshes under 100k triangles.
+        // For larger meshes, cap minimum ratio to avoid QEM instability.
+        float effectiveRatios[5];
+        size_t triCount = indices.size() / 3;
+        if (triCount > 100000) {
+            effectiveRatios[0] = 1.0f;
+            effectiveRatios[1] = 0.5f;
+            effectiveRatios[2] = 0.25f;
+            effectiveRatios[3] = 0.15f;   // instead of 0.125
+            effectiveRatios[4] = 0.10f;   // instead of 0.0625
+        } else {
+            effectiveRatios[0] = LOD_RATIOS[0];
+            effectiveRatios[1] = LOD_RATIOS[1];
+            effectiveRatios[2] = LOD_RATIOS[2];
+            effectiveRatios[3] = LOD_RATIOS[3];
+            effectiveRatios[4] = LOD_RATIOS[4];
+        }
+
         for (int i = 0; i < 5; ++i) {
             LODLevel& level = lodMesh.levels[i];
-            level.targetRatio = LOD_RATIOS[i];
+            level.targetRatio = effectiveRatios[i];
             level.debugColor  = LOD_COLORS[i];
 
             std::vector<Vertex>     outVerts;
             std::vector<uint32_t>   outIdx;
 
             // LOD 0 - No simplification needed (full res)
-            QuadricSimplifier::simplify(vertices, indices, LOD_RATIOS[i], outVerts, outIdx);
+            QuadricSimplifier::simplify(vertices, indices, effectiveRatios[i], outVerts, outIdx);
 
             level.mesh.vertices = std::move(outVerts);
             level.mesh.indices  = std::move(outIdx);
@@ -47,7 +69,7 @@ namespace acuity {
             level.mesh.setColor(level.debugColor);
 
             std::cout << "[LODGenerator] LOD " << i
-                      << " (" << int(LOD_RATIOS[i] * 100) << "%): "
+                      << " (" << int(effectiveRatios[i] * 100) << "%): "
                       << level.triangleCount << " triangles" << std::endl;
         }
 
@@ -124,5 +146,92 @@ namespace acuity {
         }
         std::cout << "[LODGenerator] All LOD levels uploaded to GPU for: "
                   << lodMesh.name << std::endl;
+    }
+
+    void LODGenerator::saveToCache(const LODMesh& lodMesh, const std::string& cacheDir)
+    {
+        // Create cache directory if it doesn't exist
+        std::filesystem::create_directories(cacheDir);
+
+        for (int i = 0; i < (int)lodMesh.levels.size(); ++i) {
+            std::string path = cacheDir + "/" + lodMesh.name + "_lod" + std::to_string(i) + ".obj";
+
+            std::ofstream f(path);
+            if (!f.is_open()) {
+                std::cerr << "[LODGenerator] Cache write failed: " << path << std::endl;
+                continue;
+            }
+
+            const auto& verts   = lodMesh.levels[i].mesh.vertices;
+            const auto& indices = lodMesh.levels[i].mesh.indices;
+
+            f << "# Acuity LOD cache: " << lodMesh.name << " level " << i << "\n";
+            f << "# Triangles: " << indices.size() / 3 << "\n";
+
+            for (const auto& v : verts)
+                f << "v " << v.position.x << " "
+                          << v.position.y << " "
+                          << v.position.z << "\n";
+
+            for (size_t j = 0; j < indices.size(); j+=3)
+                f << "f " << indices[j]+1 << " "
+                          << indices[j+1]+1 << " "
+                          << indices[j+2]+1 << "\n";
+
+            f.close();
+        }
+        std::cout << "[LODGenerator] Cache saved: " << lodMesh.name << std::endl;
+    }
+
+    bool LODGenerator::loadFromCache(const std::string& meshName, const std::string& cacheDir, LODMesh& lodMesh)
+    {
+        // Check all 5 cache files exist before attempting load
+        for (int i = 0; i < 5; ++i) {
+            std::string path = cacheDir + "/" + meshName + "_lod" + std::to_string(i) + ".obj";
+            if (!std::filesystem::exists(path))
+                return false;
+        }
+
+        lodMesh.name = meshName;
+        lodMesh.levels.resize(5);
+
+        for (int i = 0; i < 5; ++i) {
+            std::string path = cacheDir + "/" + meshName + "_lod" + std::to_string(i) + ".obj";
+
+            std::ifstream f(path);
+            if (!f.is_open()) return false;
+
+            std::vector<Vertex>   verts;
+            std::vector<uint32_t> indices;
+
+            std::string line;
+            while (std::getline(f, line)) {
+                if (line.empty() || line[0] == '#') continue;
+                std::istringstream ss(line);
+                std::string token;
+                ss >> token;
+                if (token == "v") {
+                    Vertex v{};
+                    ss >> v.position.x >> v.position.y >> v.position.z;
+                    verts.push_back(v);
+                } else if (token == "f") {
+                    uint32_t a, b, c;
+                    ss >> a >> b >> c;
+                    indices.push_back(a - 1);
+                    indices.push_back(b - 1);
+                    indices.push_back(c - 1);
+                }
+            }
+
+            lodMesh.levels[i].mesh.vertices     = std::move(verts);
+            lodMesh.levels[i].mesh.indices      = std::move(indices);
+            lodMesh.levels[i].targetRatio       = LOD_RATIOS[i];
+            lodMesh.levels[i].debugColor        = LOD_COLORS[i];
+            lodMesh.levels[i].triangleCount     = lodMesh.levels[i].mesh.getIndexCount() / 3;
+            lodMesh.levels[i].mesh.setColor(LOD_COLORS[i]);
+        }
+
+        std::cout << "[LODGenerator] Cache loaded: " << meshName << std::endl;
+        return true;
     }
 }

@@ -8,7 +8,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace Acuity {
+namespace acuity {
     static constexpr int NUM_LOD_LEVELS = 5;
     static constexpr float DEFAULT_THRESHOLD = 0.5f;
 

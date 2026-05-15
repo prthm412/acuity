@@ -5,12 +5,25 @@
 #include <chrono>
 #include <cstring>
 #include <iostream>
+#include <cstdio>
+#ifdef _WIN32
+#include <io.h>
+#endif
 
-namespace Acuity {
+namespace acuity {
     // Constructor
-    ONNXInference::ONNXInference(const std::string& modelPath) : m_env(ORT_LOGGING_LEVEL_WARNING, "AcuityONNX") {
+    ONNXInference::ONNXInference(const std::string& modelPath) : m_env(ORT_LOGGING_LEVEL_ERROR, "AcuityONNX") {
         m_sessionOptions.SetIntraOpNumThreads(1);
         m_sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+        // Suppress ONNX schema registration warnings printed to stderr
+        FILE* devNull = nullptr;
+        int savedStderr = -1;
+
+    #ifdef _WIN32
+        savedStderr = _dup(_fileno(stderr));
+        freopen_s(&devNull, "NUL", "w", stderr);
+    #endif
 
         // Convert path to wide string on Windows (ONNX Runtime requires wchar_t*)
     #ifdef _WIN32

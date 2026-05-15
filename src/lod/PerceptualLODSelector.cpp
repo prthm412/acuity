@@ -7,7 +7,7 @@
 #include <sstream>
 #include <iomanip>
 
-namespace Acuity {
+namespace acuity {
     // Constructor
     PerceptualLODSelector::PerceptualLODSelector() : m_model(nullptr) // model path is set in init()
     {
@@ -28,7 +28,6 @@ namespace Acuity {
         // reload by constructing a new ONNXInference in place
         try {
             m_model = std::make_unique<ONNXInference>(modelPath);
-            new (&m_model) ONNXInference(modelPath);
         } catch (const std::exception& e) {
             std::cerr << "[PerceptualLODSelector] Failed to load model: " << e.what() << "\n";
             return false;
@@ -47,10 +46,10 @@ namespace Acuity {
         if (!m_ready || lodMeshes.empty()) return 0;
 
         // Check cache
-        std::string key = makeCacheKey(meshId, view);
-        auto it = m_cache.find(key);
-        if (it != m_cache.end())
-            return it->second;
+        // std::string key = makeCacheKey(meshId, view);
+        // auto it = m_cache.find(key);
+        // if (it != m_cache.end())
+        //     return it->second;
 
         // Score all LOD levels
         m_lastCandidates.clear();
@@ -76,7 +75,7 @@ namespace Acuity {
         }
 
         // Store in cache
-        m_cache[key] = selected;
+        // m_cache[key] = selected;
         return selected;
     }
 

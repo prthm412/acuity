@@ -40,5 +40,14 @@ namespace acuity {
                 VkCommandPool       commandPool,
                 VkQueue             graphicsQueue
             );
+
+            // Save all LOD levels to cache directory as OBJ files.
+            // cacheDir: "data/processed/lod_cache"
+            static void saveToCache(const LODMesh& lodMesh, const std::string& cacheDir);
+
+            // Load LOD levels from cache if they exist.
+            // Returns true and populates lodMesh if all 5 cache files found.
+            // Returns false if cache is missing or incomplete.
+            static bool loadFromCache(const std::string& meshName, const std::string& cacheDir, LODMesh& lodMesh);
     };
 }

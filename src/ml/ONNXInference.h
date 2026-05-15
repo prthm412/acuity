@@ -6,7 +6,7 @@
 #include <memory>
 #include <array>
 
-namespace Acuity {
+namespace acuity {
     class ONNXInference {
         public:
             static constexpr int  FEATURE_DIM = 38;

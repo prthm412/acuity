@@ -35,6 +35,7 @@ set(SOURCES
     src/lod/FeatureExtractor.cpp
     src/lod/PerceptualLODSelector.cpp
     src/renderer/FrustumCuller.cpp
+    src/benchmark/BenchmarkRunner.cpp
 )
 
 add_executable(Acuity ${SOURCES})

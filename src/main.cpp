@@ -26,6 +26,8 @@
 #include "lod/GeometricLODSelector.h"
 #include "lod/PerceptualLODSelector.h"
 
+#include "benchmark/BenchmarkRunner.h"
+
 #include <iostream>
 #include <stdexcept>
 #include <chrono>
@@ -93,6 +95,73 @@ class AcuityApp {
             mainLoop();
             cleanup();
         }
+
+        bool tickOneFrame() {
+            glfwPollEvents();
+            if (glfwWindowShouldClose(window)) return false;
+            updateFPS();
+            updateLOD();
+            drawFrame();
+            ++framesSinceStart;
+            return true;
+        }
+
+        void initOnly(const std::string& meshPath) {
+            initWindow();
+            initVulkan(meshPath);
+        }
+
+        void runBenchmarks() {
+            auto iface = makeBenchmarkInterface();
+            acuity::BenchmarkRunner runner(iface);
+
+            const std::vector<std::pair<std::string,std::string>> scenes = {
+                {"Bunny",     "../assets/models/stanford/stanford-bunny.obj"},
+                {"Dragon",    "../assets/models/stanford/xyzrgb_dragon.obj"},
+                {"Sponza",    "../assets/models/mcguire/sponza.obj"},
+                {"SanMiguel", "../assets/models/mcguire/san-miguel.obj"},
+            };
+            const std::vector<acuity::LODMethod> methods = {
+                acuity::LODMethod::Geometric,
+                acuity::LODMethod::Perceptual,
+                acuity::LODMethod::Oracle,
+            };
+
+            std::string currentScenePath = "";
+            std::vector<acuity::BenchmarkConfig> configs;
+            for (const auto& [name, path] : scenes) {
+                for (auto method : methods) {
+                    for (int rep = 0; rep < 3; ++rep) {
+                        acuity::BenchmarkConfig cfg;
+                        cfg.sceneName  = name;
+                        cfg.meshPath   = path;
+                        cfg.method     = method;
+                        cfg.duration   = 60.0f;
+                        cfg.repetition = rep;
+                        cfg.outputDir  = "../results/benchmarks";
+                        cfg.cameraPath = acuity::BenchmarkRunner::buildCameraPath(name, cfg.duration);
+                        configs.push_back(cfg);
+                    }
+                }
+            }
+
+            for (const auto& cfg : configs) {
+                if (cfg.meshPath != currentScenePath) {
+                    std::cout << "[Benchmark] Loading scene: " << cfg.sceneName << "\n";
+                    loadScene(cfg.meshPath);
+                    currentScenePath = cfg.meshPath;
+                }
+                auto result = runner.run(cfg);
+                acuity::BenchmarkRunner::writeJSON(result, cfg.outputDir + "/" +
+                    cfg.sceneName + "_" + acuity::BenchmarkRunner::methodName(cfg.method) +
+                    "_rep" + std::to_string(cfg.repetition) + ".json");
+            }
+
+            // Write summary CSV
+            // Re-run runAll is not needed — results already written per-run above
+            std::cout << "[Benchmark] All runs complete.\n";
+            cleanup();
+        }
     
     private:
         GLFWwindow*             window = nullptr;
@@ -128,6 +197,62 @@ class AcuityApp {
         float       currentDistance  = 0.0f;
         uint32_t    framesSinceStart = 0;
         std::vector<float> fpsHistory;
+
+        float m_lastFrameTimeMs     = 0.0f;
+        float m_lastLODSelectionMs  = 0.0f;
+        float m_lastRenderMs        = 0.0f;
+        std::chrono::steady_clock::time_point m_lastFrameStart;
+
+        acuity::BenchmarkRunner::AppInterface makeBenchmarkInterface() {
+            acuity::BenchmarkRunner::AppInterface iface;
+
+            iface.setLODMethod = [this](acuity::LODMethod m) {
+                switch (m) {
+                    case acuity::LODMethod::Geometric:  lodMethod = 0; break;
+                    case acuity::LODMethod::Perceptual: lodMethod = 1; break;
+                    case acuity::LODMethod::Oracle:     lodMethod = 2; break;
+                }
+            };
+
+            iface.setCamera = [](glm::vec3 pos, glm::vec3 target) {
+                glm::vec3 offset = pos - target;
+                g_camera.radius  = glm::length(offset);
+                if (g_camera.radius < 0.01f) g_camera.radius = 0.01f;
+                glm::vec3 dir    = glm::normalize(offset);
+                g_camera.phi     = glm::degrees(std::asin(glm::clamp(dir.y, -1.0f, 1.0f)));
+                g_camera.theta   = glm::degrees(std::atan2(dir.z, dir.x));
+            };
+
+            iface.getFrameMetrics = [this]() -> acuity::FrameMetrics {
+                acuity::FrameMetrics fm;
+                fm.frameTimeMs    = m_lastFrameTimeMs;
+                fm.fps            = fps;
+                fm.selectedLOD    = currentLODLevel;
+                fm.triangleCount  = static_cast<int>(lodMesh.levels[currentLODLevel].triangleCount);
+                fm.lodSelectionMs = m_lastLODSelectionMs;
+                fm.renderMs       = m_lastRenderMs;
+                return fm;
+            };
+
+            iface.getGPUMemory = [this]() -> uint64_t {
+                uint64_t total = 0;
+                for (const auto& lev : lodMesh.levels) {
+                    total += static_cast<uint64_t>(lev.mesh.getIndexCount())  * sizeof(uint32_t);
+                    total += static_cast<uint64_t>(lev.mesh.getVertexCount()) * sizeof(acuity::Vertex);
+                }
+                return total;
+            };
+
+            iface.captureScreenshot = [](const std::string& path) {
+                std::cout << "[Benchmark] Screenshot requested: " << path << "\n";
+            };
+
+            iface.tickFrame = [this]() -> bool {
+                return tickOneFrame();
+            };
+
+            return iface;
+        }
 
         void initWindow() {
             glfwInit();
@@ -166,6 +291,7 @@ class AcuityApp {
             initImGui();
 
             lastFpsTime = std::chrono::steady_clock::now();
+            m_lastFrameStart = std::chrono::steady_clock::now();
             std::cout << "[App] LOD systems ready. Controls: LMB=orbit, MMB=pan, scroll=zoom, R=reset" << std::endl;
 
             if (perceptualSelector.init("../data/models/lod_perception.onnx", "../data/processed/feature_scaler.txt")) {
@@ -280,8 +406,11 @@ class AcuityApp {
         }
 
         void updateFPS() {
+            auto now = std::chrono::steady_clock::now();
+            m_lastFrameTimeMs = std::chrono::duration<float, std::milli>(now - m_lastFrameStart).count();
+            m_lastFrameStart  = now;
+
             ++frameCount;
-            auto  now     = std::chrono::steady_clock::now();
             float elapsed = std::chrono::duration<float>(now - lastFpsTime).count();
             if (elapsed >= 0.5f) {
                 fps = frameCount / elapsed;
@@ -324,6 +453,8 @@ class AcuityApp {
                 return;
             }
 
+            auto lodStart = std::chrono::high_resolution_clock::now();
+
             if (lodMethod == 0) {
                 // Geometric: distance-based
                 currentLODLevel = lodSelector.selectLOD(camPos, meshPos, lodMesh);
@@ -350,9 +481,12 @@ class AcuityApp {
                 // Oracle: always LOD 0 (highest detail)
                 currentLODLevel = 0;
             }
+            m_lastLODSelectionMs = std::chrono::duration<float, std::milli>(
+                std::chrono::high_resolution_clock::now() - lodStart).count();
         }
 
         void drawFrame() {
+            auto renderStart = std::chrono::high_resolution_clock::now();
             vkWaitForFences(ctx.device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
             uint32_t imageIndex;
@@ -394,6 +528,8 @@ class AcuityApp {
                 recreateSwapchain();
             }
             currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+            m_lastRenderMs = std::chrono::duration<float, std::milli>(
+                std::chrono::high_resolution_clock::now() - renderStart).count();
         }
 
         void recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
@@ -533,14 +669,35 @@ class AcuityApp {
             glfwDestroyWindow(window);
             glfwTerminate();
         }
+
+        void loadScene(const std::string& meshPath) {
+            vkDeviceWaitIdle(ctx.device);
+            lodMesh.destroy(ctx.device);
+            m_cachedLODMeshDatas.clear();
+            m_lodMeshDatasCached = false;
+
+            if (!meshPath.empty()) {
+                lodMesh = acuity::LODGenerator::generateFromFile(meshPath);
+            } else {
+                lodMesh = generateSphereLODs(1.0f, 32, 32);
+            }
+
+            acuity::LODGenerator::uploadToGPU(lodMesh, ctx.device,
+                                            ctx.physicalDevice,
+                                            ctx.commandPool,
+                                            ctx.graphicsQueue);
+        }
 };
 
 int main(int argc, char* argv[]) {
     // Check for --batch flag to run headless batch rendering
-    bool batchMode = false;
+    bool batchMode     = false;
+    // Check for --benchmark flag
+    bool benchmarkMode = false;
     std::string meshPath = "";
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--batch") batchMode = true;
+        else if (std::string(argv[i]) == "--benchmark") benchmarkMode = true;
         else meshPath = argv[i];
     }
 
@@ -595,7 +752,12 @@ int main(int argc, char* argv[]) {
     // Normal iterative mode
     AcuityApp app;
     try {
-        app.run(meshPath);
+        if (benchmarkMode) {
+            app.initOnly("../assets/models/stanford/stanford-bunny.obj");
+            app.runBenchmarks();
+        } else {
+            app.run(meshPath);
+        }
     } catch (const std::exception& e) {
         std::cerr << "[Fatal] " << e.what() << std::endl;
         return 1;

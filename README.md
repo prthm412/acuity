@@ -2,265 +2,258 @@
 
 **Learned Perceptual Quality Assessment for Triangle Mesh LOD Selection**
 
-A research project implementing ML-based perceptual quality assessment for real-time Level of Detail (LOD) selection in 3D mesh rendering.
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
+![C++](https://img.shields.io/badge/C%2B%2B-17-blue)
+![Vulkan](https://img.shields.io/badge/Vulkan-1.4-red)
+![Python](https://img.shields.io/badge/Python-3.13-yellow)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## Overview
+Acuity is a real-time rendering system that replaces distance-based Level of Detail (LOD) selection with a small neural network that predicts **perceived visual quality**. It was built end to end for an M.Tech dissertation: a custom C++17/Vulkan renderer, a from-scratch Quadric Error Metric (QEM) simplifier, an automated dataset pipeline, a PyTorch model, and ONNX Runtime inference inside the render loop.
 
-Reduces memory usage in real-time 3D rendering by using a learned perceptual quality model to intelligently select mesh LOD levels, maintaining visual quality while optimizing resources.
-This project aims to reduce memory usage in real-time 3D rendering by using a learned perceptual quality model to intelligently select mesh LOD levels, maintaining visual quality while optimizing resource usage.
+> **Research question:** Can a learned perceptual quality model choose mesh LODs better than a geometric-error heuristic, in real time and at negligible cost?
 
-**Key Innovation**: Building a system to apply learned image quality assessment to real-time triangle mesh LOD selection.
+<!-- Add a short demo GIF here: docs/screenshots/demo.gif -->
+![Acuity demo](docs/screenshots/acuity.gif)
 
+---
+
+## Key Results
+
+| Metric | Geometric baseline | Acuity (learned) |
+|---|---|---|
+| SRCC vs. perceptual quality score | 0.7145 | **0.9224** |
+| MSE | 0.210392 | **0.001224** (171x lower) |
+| R² | -79.3 | **0.92+** |
+| Inference time per mesh (ONNX Runtime) | n/a | **0.0062 ms** (161x under a 1 ms budget) |
+| FPS overhead vs. baseline | n/a | **0% measurable** |
+
+- All three LOD methods (Geometric, Perceptual, Oracle) sustained 3,500+ FPS across the four test scenes (Bunny, Dragon, Sponza, San Miguel), well above the 60 FPS target.
+- Memory savings are **scene-dependent**. For example, Sponza showed roughly 50% triangle reduction under LOD switching, while in some scenes the perceptual selector matched the oracle's triangle count to preserve quality. See the thesis for the per-scene breakdown.
+
+---
+
+## How It Works
+
+```
+Meshes ──► QEM simplification ──► 5 LOD levels (100%, 50%, 25%, 12.5%, 6.25%)
+                                        │
+                                        ▼
+                  Batch renderer (14 meshes × 5 LODs × 40 camera poses = 2,800 images)
+                                        │
+                                        ▼
+                  Image-quality model (TOPIQ) ──► perceptual quality labels
+                                        │
+                                        ▼
+        38-D features (geometric + perceptual + view-dependent) ──► MLP (~25K params)
+                                        │
+                                        ▼
+                         Export to ONNX ──► ONNX Runtime in C++
+                                        │
+                                        ▼
+        PerceptualLODSelector (spatial-hash cache + hysteresis) in the Vulkan render loop
+```
+
+1. **LOD generation:** Quadric Error Metrics (Garland & Heckbert, 1997), implemented from scratch in C++.
+2. **Dataset:** an automated pipeline renders every mesh/LOD/pose combination and annotates it with an image-quality model as a perceptual proxy.
+3. **Features:** 38 dimensions across three groups: geometric, perceptual (curvature, saliency, normal variation), and view-dependent (distance, angle, screen coverage).
+4. **Model:** a lightweight MLP trained in PyTorch, exported to ONNX.
+5. **Runtime selection:** the C++ renderer extracts the same features, runs ONNX inference, and picks a LOD. Predictions are cached with a spatial hash and stabilised with hysteresis to avoid LOD popping.
+6. **Evaluation:** an automated benchmark suite compares Geometric, Perceptual, and Oracle selection across four scenes.
+
+---
+
+## Features
+
+- Custom Vulkan renderer with orbit camera, mesh loading (Assimp), and a Dear ImGui debug overlay
+- From-scratch QEM edge-collapse simplifier and 5-level LOD generator
+- Three switchable LOD methods at runtime: **Geometric**, **Perceptual**, **Oracle**
+- LOD colour-coding visualisation
+- Automated benchmark runner (scenes × methods × repetitions) with JSON/CSV output
+- Reproducible Python pipeline for dataset generation, training, evaluation, and ablation studies
+
+---
 
 ## Tech Stack
 
-- **Rendering**: C++17, Vulkan
-- **Machine Learning**: Python, PyTorch, ONNX Runtime
-- **Build System**: CMake
-- **Dependencies**: GLFW, GLM, Assimp, ImGui
+| Area | Technology |
+|---|---|
+| Rendering | C++17, Vulkan 1.4, GLSL, GLFW, GLM, Assimp, Dear ImGui |
+| ML training | Python 3.13, PyTorch, scikit-learn |
+| Dataset generation | PyVista, Open3D, TOPIQ (image quality model) |
+| Deployment | ONNX (opset 14), ONNX Runtime |
+| Build | CMake, vcpkg, MSVC (Visual Studio 2026) |
+| Analysis | NumPy, pandas, SciPy, Matplotlib |
 
-### Detailed Stack
-### C++ Rendering Engine
-
-- **Graphics API**: Vulkan 1.4.341.1
-- **Window/Input**: GLFW 3.4+
-- **Math**: GLM 1.0+
-- **Mesh Loading**: Assimp 5.4+
-- **UI**: Dear ImGui 1.91+
-- **Build**: CMake 3.31.11
-- **Compiler**: MSVC 19.4+ (Visual Studio 2026)
-
-### Machine Learning Pipeline
-
-- **Framework**: PyTorch 2.5+
-- **Runtime**: Python 3.13.1
-- **Export**: ONNX 1.17+
-- **Inference**: ONNX Runtime 1.20+
-- **Dataset**: Q-Bench (ICLR 2024)
-
+---
 
 ## System Requirements
 
-### Minimum
+**Minimum:** Windows 10/11 (64-bit), GTX 1060 / RX 580 (Vulkan 1.3), 8 GB RAM, 50 GB storage (datasets)
+**Recommended:** Windows 11, RTX 3060+ / RX 6700+ (Vulkan 1.4), 16 GB+ RAM, 100 GB SSD
 
-- **OS**: Windows 10/11 (64-bit)
-- **GPU**: NVIDIA GTX 1060 / AMD RX 580 (Vulkan 1.3 support)
-- **RAM**: 8 GB
-- **Storage**: 50 GB (for datasets)
+> Developed and tested on Windows. Linux support has not been verified.
 
-### Recommended
-
-- **OS**: Windows 11
-- **GPU**: NVIDIA RTX 3060+ / AMD RX 6700+ (Vulkan 1.4 support)
-- **RAM**: 16 GB+
-- **Storage**: 100 GB SSD
-
+---
 
 ## Build Instructions
 
 ### Prerequisites
 
-Install these tools in order:
-
-1. **Visual Studio 2026 Community**
-
-   - Download: https://visualstudio.microsoft.com/
-   - Select: "Desktop development with C++"
-   - Include: MSVC, CMake tools, Windows 11 SDK, vcpkg
-2. **CMake 3.31.11**
-
-   - Download: https://cmake.org/download/
-   - Add to PATH during installation
-3. **Vulkan SDK 1.4.341.1**
-
-   - Download: https://vulkan.lunarg.com/
-   - Install with validation layers
-4. **Python 3.13.1**
-
-   - Download: https://www.python.org/downloads/
-   - Check "Add Python to PATH"
+1. **Visual Studio 2026 Community** with "Desktop development with C++" (MSVC, CMake tools, Windows SDK)
+2. **CMake 3.31+**, added to PATH
+3. **Vulkan SDK 1.4.341.1** with validation layers
+4. **Python 3.13**, added to PATH
 5. **Git**
+6. **vcpkg** (installed at `C:\vcpkg` in the examples below)
 
-   - Verify: `git --version`
-
-
-### Installation
-
-#### Step 1: Clone Repository
+### 1. Clone
 
 ```bash
-git clone https://github.com/orthm412/acuity.git
+git clone https://github.com/prthm412/acuity.git
 cd acuity
-git checkout develop
 ```
 
-#### Step 2: Install C++ Dependencies (vcpkg)
+### 2. C++ dependencies
 
 ```bash
-# Navigate to vcpkg installation (or install it)
 cd C:\vcpkg
-
-# Bootstrap (first time only)
 .\bootstrap-vcpkg.bat
-
-# Install dependencies
-.\vcpkg install glfw3:x64-windows
-.\vcpkg install glm:x64-windows
-.\vcpkg install assimp:x64-windows
-.\vcpkg install imgui[glfw-binding,vulkan-binding]:x64-windows
-
-# Linux users: replace :x64-windows with :x64-linux
+.\vcpkg install glfw3:x64-windows glm:x64-windows assimp:x64-windows
+.\vcpkg install "imgui[glfw-binding,vulkan-binding]:x64-windows"
 ```
 
-#### Step 3: Setup Python Environment
+ONNX Runtime is also required; see `CMakeLists.txt` for how it is located.
+
+### 3. Python environment
 
 ```bash
 cd acuity
-
-# Create virtual environment
 python -m venv venv
-
-# Activate
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-
-# Upgrade pip
+venv\Scripts\activate
 python -m pip install --upgrade pip
-
-# Install dependencies
 pip install -r python/requirements.txt
 ```
 
-#### Step 4: Configure CMake
+### 4. Configure and build
 
 ```bash
 mkdir build
 cd build
-
-# Configure (set VCPKG_ROOT to your vcpkg path)
 cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-# Or if VCPKG_ROOT environment variable is set:
-cmake ..
-```
-
-#### Step 5: Build
-
-```bash
-# Windows (Visual Studio)
 cmake --build . --config Release
-
-# Linux (Make)
-make -j$(nproc)
 ```
 
-#### Step 6: Run
+### 5. Run
 
 ```bash
-# From build directory
-./Release/Acuity.exe  # Windows
-# ./Acuity  # Linux
+# Interactive viewer
+.\Release\Acuity.exe <path-to-mesh>
+
+# Automated benchmark
+.\Release\Acuity.exe --benchmark
 ```
 
-Expected output:
+**Controls:** left mouse = orbit, middle mouse = pan, scroll = zoom, `Esc` = quit.
+Use the ImGui panel to switch between Geometric / Perceptual / Oracle LOD selection.
 
-```
-=== Acuity Build Test ===
-✓ GLFW initialized
-✓ Vulkan available (version: 1.4)
-✓ GLM working (test vector: 1, 2, 3)
+---
 
-✓ All systems operational!
-Environment setup complete. Ready for Step 1.3!
+## Reproducing the ML Pipeline
+
+```bash
+# 1. Render the dataset (14 meshes × 5 LODs × 40 poses)
+python python/dataset/generate_dataset.py
+
+# 2. Extract the 38-D features
+python python/dataset/extract_features.py
+
+# 3. Train the model
+python python/training/train.py
+
+# 4. Export to ONNX
+python python/training/export_onnx.py
+
+# 5. Analysis and ablation studies
+python python/evaluation/<script-name>.py
 ```
+
+> Script names reflect the repository layout; check each folder for options and arguments.
+
+---
 
 ## Project Structure
 
 ```
 acuity/
-├── src/                    # C++ source code
+├── src/
 │   ├── renderer/           # Vulkan renderer
-│   ├── lod/                # LOD system
+│   ├── lod/                # QEM simplifier, LOD generator, feature extraction, LOD selectors
 │   ├── ml/                 # ONNX Runtime inference wrapper
-│   └── benchmark/          # Benchmark suite
-├── python/                 # ML training pipeline
-│   ├── dataset/            # Dataset generation & feature extraction
-│   ├── training/           # Model training & evaluation
-│   └── evaluation/         # Results analysis & ablation studies
+│   └── benchmark/          # Benchmark runner
+├── python/
+│   ├── dataset/            # Dataset generation and feature extraction
+│   ├── training/           # Model, training, ONNX export
+│   └── evaluation/         # Analysis and ablation studies
 ├── assets/
 │   ├── shaders/            # GLSL shaders
 │   └── models/             # 3D mesh files
 ├── data/
-│   ├── raw/                # Downloaded datasets
+│   ├── raw/                # Downloaded datasets (not tracked)
 │   ├── processed/          # Generated dataset, features, splits
-│   └── models/             # Trained model files
-├── docs/
-│   ├── screenshots/        # Renderer screenshots
-│   ├── experiments/        # Experiment logs & baseline reports
-│   └── notes/              # Research notes & literature review
-├── results/                # Benchmark results, figures, LaTeX tables
-├── diagrams/               # Class diagrams & architecture documentation
-└── build/                  # CMake build output (gitignored)
+│   └── models/             # Trained PyTorch and ONNX models
+├── docs/                   # Notes, experiment reports, screenshots
+├── results/                # Benchmarks, figures, LaTeX tables
+├── diagrams/               # Class diagrams and architecture documentation
+└── build/                  # CMake output (gitignored)
 ```
 
-## Development Status
+---
 
-![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
-![Phase](https://img.shields.io/badge/Phase-2%20of%204(5)-blue)
+## Limitations
 
-### Currently working on
+- Quality labels come from an image-quality model used as a **perceptual proxy**, not from a human user study.
+- The training set covers 14 meshes; generalisation to very different geometry (e.g. thin or highly organic structures) is untested.
+- Memory savings vary by scene rather than following a single flat percentage.
+- Tested on Windows with Vulkan only.
 
-🚧 **In Development** - Phase 2: Data Generation
+## Future Work
 
+- Human user study to validate the proxy labels
+- Larger and more varied mesh set; texture- and material-aware features
+- Integration into an existing engine, and temporal/animation-aware selection
 
-- [ ] Phase 2.2: Rendering Pipeline
-- [ ] Phase 2.3: Quality Annotation
+---
 
-### Completed
+## Documentation
 
-- [x] Phase 1.1: Literature review
-- [x] Phase 1.2: Environment setup (in progress)
-- [x] Phase 1.3: Basic Vulkan renderer
-- [x] Phase 1.4: Baseline LOD system
-- [x] Phase 2.1: Dataset
-
-### Progress Screenshots
-Basic Renderer (Phase 1)
-![Acuity Renderer](docs/screenshots/1.3_renderer.png)
-
-LOD Selection system (Phase 2; different colors and level of details for different distances)
-![Acuity Renderer](docs/screenshots/1.4_lod_selection_1.png)
-![Acuity Renderer](docs/screenshots/1.4_lod_selection_2.png)
-
-
-## License
-
-![License](https://img.shields.io/badge/License-MIT-green)
-
-## Author
-
-Prathmesh Mathur
-M.Tech Research Project
-
-- GitHub: [@prthm412](https://github.com/prthm412)
-- LinkedIn: [Prathmesh Mathur](https://www.linkedin.com/in/prthmmthr/)
-
-
-Computer Graphics & Machine Learning
-
-
-**Research Question**: Can we reduce memory usage in real-time rendering by 20-30% using learned perceptual quality assessment while maintaining visual fidelity?
-
+- Thesis and presentation: `docs/` *(add links if public)*
+- Experiment reports: `docs/experiments/`
+- Research notes and literature review: `docs/notes/`
 
 ## Citation
 
 ```bibtex
 @mastersthesis{acuity2026,
-  title={Learned Perceptual Quality Assessment for Triangle Mesh LOD Selection},
-  author={Prathmesh Mathur},
-  year={2026},
-  school={Jaypee Institute of Information Technology}
+  title  = {Learned Perceptual Quality Assessment for Triangle Mesh LOD Selection},
+  author = {Mathur, Prathmesh},
+  year   = {2026},
+  school = {Jaypee Institute of Information Technology}
 }
 ```
 
----
+## License
+
+Released under the [MIT License](LICENSE).
+
+## Author
+
+**Prathmesh Mathur**
+M.Tech, Jaypee Institute of Information Technology
+
+- GitHub: [@prthm412](https://github.com/prthm412)
+- LinkedIn: [Prathmesh Mathur](https://www.linkedin.com/in/prthmmthr/)
+- [Portfolio](https://prthm.vercel.app)
+
+## Acknowledgements
+
+Garland & Heckbert (QEM), Q-Bench, TOPIQ, and the Stanford and McGuire mesh repositories.
